@@ -1,0 +1,21 @@
+full_task 	= { SOI ~ task ~ EOI }
+task 		= { completion_mark? ~ priority? ~ ( completed_date ~ created_date | created_date )? ~ description }
+
+completion_mark	= { "x" }
+priority 	= { "(" ~ ASCII_ALPHA_UPPER ~ ")" }
+completed_date 	=  { date }
+created_date 	=  { date }
+date 		= ${ year ~ "-" ~ month ~ "-" ~ day }
+year		= @{ ASCII_DIGIT ~ ASCII_DIGIT ~ ASCII_DIGIT ~ ASCII_DIGIT }
+month		= @{ ASCII_DIGIT ~ ASCII_DIGIT }
+day		= @{ ASCII_DIGIT ~ ASCII_DIGIT }
+
+description 	= ${ ( !project ~ !meta ~ ( context | other ) )* ~ project? ~ ( !project ~ !meta ~ (context | other ) )* ~ meta* }
+project		= ${ "+" ~ tag }
+context		= ${ "@" ~ tag }
+other		= @{ (!project ~ !meta ~ !context ~ ANY)+ }
+meta		= @{ tag ~ ":" ~ meta_value }
+tag 		= @{ ( ASCII_ALPHANUMERIC | "-" | "_" )+ }
+meta_value	= @{ ( !( ":" | SPACE_SEPARATOR ) ~ ANY )+ }
+
+WHITESPACE 	= _{ SPACE_SEPARATOR }

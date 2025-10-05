@@ -1,0 +1,376 @@
+use std::cmp::Reverse;
+use std::collections::BTreeMap;
+use std::fmt::Display;
+use std::fs;
+use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
+
+use chrono::{Datelike, NaiveDate, Utc};
+use colored::Colorize;
+use pest::iterators::Pairs;
+use pest::Parser;
+use pest_derive::Parser;
+
+
+use crate::error::{ToroError, ToroResult};
+
+#[derive(Debug)]
+pub struct TodoTxtFile {
+    location: PathBuf,
+    tasks: Vec<TodoTxtTask>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd)]
+pub enum DateRecord {
+    Created(NaiveDate),
+    CompletedCreated(NaiveDate, NaiveDate),
+    NoDate
+}
+
+#[derive(Debug, Clone)]
+pub enum DescriptionToken {
+    Project(String),
+    Context(String),
+    Other(String),
+    Meta(String, String),
+}
+
+#[derive(Debug)]
+pub struct TodoTxtTask {
+    completed: bool,
+    priority: Option<char>,
+    dates: DateRecord,
+    description: Vec<DescriptionToken>,
+    project: Option<String>,
+    context: Vec<String>,
+    metadata: BTreeMap<String, String>
+}
+
+#[derive(Parser)]
+#[grammar = "grammar.pest"]
+struct TodoTxtParser;
+
+
+impl TodoTxtFile {
+    pub fn new(path: PathBuf) -> Self {
+        TodoTxtFile {
+            location: path,
+            tasks: Vec::new(),
+        }
+    }
+
+    pub fn load(path: PathBuf) -> ToroResult<Self> {
+        let content = fs::read_to_string(&path)
+            .map_err(|e| ToroError::NamedIOError(path.clone(), e))?;
+        let mut tasks = content.lines()
+            .map(TodoTxtTask::parse)
+            .collect::<ToroResult<Vec<_>>>()?;
+        tasks.sort_by_key(|t| Reverse(t.when_created().unwrap_or(NaiveDate::default())));
+        tasks.sort_by_key(|t| t.priority().unwrap_or('['));
+        tasks.sort_by_key(|t| t.completed());
+        Ok(TodoTxtFile {
+            location: path,
+            tasks: tasks,
+        })
+    }
+}
+
+impl TodoTxtTask {
+    fn parse(line: &str) -> ToroResult<Self> {
+        let parsed = TodoTxtParser::parse(Rule::full_task, line)
+            .map_err(|e| ToroError::SyntaxError(Box::new(e)))?
+            .next().unwrap()
+            .into_inner().next().unwrap();
+        // println!("{:#?}", parsed);
+
+        assert!(parsed.as_rule() == Rule::task);
+
+        let mut inner = parsed.into_inner();
+        let next_rule_is = |i: &Pairs<Rule>, r: Rule| i.peek().map(|p| p.as_rule()) == Some(r);
+
+        let completed = if next_rule_is(&inner, Rule::completion_mark) {
+            inner.next();
+            true
+        } else {
+            false
+        };
+
+        let priority = if next_rule_is(&inner, Rule::priority) {
+            let c = inner.next().unwrap()
+                .as_str().chars()
+                .skip(1).next()
+                .unwrap();
+            Some(c)
+        } else {
+            None
+        };
+
+        let dates = if next_rule_is(&inner, Rule::completed_date) {
+            let completed_pair = inner.next().unwrap()
+                .into_inner()
+                .next().unwrap();
+            assert!(next_rule_is(&inner, Rule::created_date));
+            let created_pair = inner.next().unwrap()
+                .into_inner()
+                .next().unwrap();
+            DateRecord::CompletedCreated(parse_date(completed_pair.as_str())?, parse_date(created_pair.as_str())?)
+        } else if next_rule_is(&inner, Rule::created_date) {
+            let created_pair = inner.next().unwrap()
+                .into_inner()
+                .next().unwrap();
+            DateRecord::Created(parse_date(created_pair.as_str())?)
+        } else {
+            DateRecord::NoDate
+        };
+
+        assert!(next_rule_is(&inner, Rule::description));
+        let description_pair = inner.next().unwrap();
+        // let description = description_pair.as_str().to_owned();
+        let description_inner = description_pair.into_inner();
+
+        let mut description = Vec::new();
+        let mut project = None;
+        let mut context = Vec::new();
+        let mut metadata = BTreeMap::new();
+        for pair in description_inner {
+            if pair.as_rule() == Rule::other {
+                let val = pair.as_str().to_owned();
+                description.push(DescriptionToken::Other(val));
+            } else if pair.as_rule() == Rule::project {
+                let val = pair.into_inner().next().unwrap().as_str().to_owned();
+                project = Some(val.clone());
+                description.push(DescriptionToken::Project(val));
+            } else if pair.as_rule() == Rule::context {
+                let val = pair.into_inner().next().unwrap().as_str().to_owned();
+                context.push(val.clone());
+                description.push(DescriptionToken::Context(val));
+            } else if pair.as_rule() == Rule::meta {
+                let mut split = pair.as_str().split(":");
+                let key = split.next().unwrap();
+                let value = split.next().unwrap();
+                metadata.insert(key.to_owned(), value.to_owned());
+                description.push(DescriptionToken::Meta(key.to_owned(), value.to_owned()));
+            } else {
+                panic!("Unexpected pair ({:?})", pair.as_rule());
+            }
+        }
+
+        Ok(TodoTxtTask { completed, priority, dates, description, project, context, metadata })
+    }
+
+    pub fn to_string_colored(&self) -> String {
+        let mut s = String::new();
+
+        if self.completed() {
+            s.push_str("x ");
+        } else {
+            s.push_str("  ");
+        }
+
+        if let Some(prio) = self.priority {
+            s.push_str(&format!("({}) ", prio));
+        } else {
+            s.push_str("    ");
+        }
+
+        s.push_str(&format!("{:<22} ", self.dates.to_string()));
+
+        for token in &self.description {
+            s.push_str(&token.to_string_colored());
+        }
+
+        if self.completed() {
+            s.strikethrough().to_string()
+        } else {
+            s
+        }
+    }
+
+    pub fn completed(&self) -> bool {
+        self.completed
+    }
+
+    pub fn when_completed(&self) -> Option<NaiveDate> {
+        self.dates.completed()
+    }
+
+    pub fn when_created(&self) -> Option<NaiveDate> {
+        self.dates.created()
+    }
+
+    pub fn when_due(&self) -> ToroResult<Option<NaiveDate>> {
+        match self.metadata.get("due") {
+            Some(val) => Ok(Some(parse_date(val)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn complete(&mut self) {
+        self.completed = true;
+        self.dates.set_completed(Utc::now().naive_local().into())
+    }
+
+    pub fn uncomplete(&mut self) {
+        self.completed = false;
+        self.dates.set_not_completed()
+    }
+
+    pub fn priority(&self) -> Option<char> {
+        self.priority
+    }
+}
+
+impl DateRecord {
+    pub fn created(&self) -> Option<NaiveDate> {
+        use DateRecord::*;
+        match *self {
+            Created(date) => Some(date),
+            CompletedCreated(_, date) => Some(date),
+            NoDate => None,
+        }
+    }
+
+    pub fn completed(&self) -> Option<NaiveDate> {
+        use DateRecord::*;
+        match *self {
+            Created(date) => Some(date),
+            CompletedCreated(_, date) => Some(date),
+            NoDate => None,
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        *self == DateRecord::NoDate
+    }
+
+    pub fn with_created(self, created: NaiveDate) -> Self {
+        use DateRecord::*;
+        match self {
+            CompletedCreated(comp, _) => CompletedCreated(comp, created),
+            _ => Created(created),
+        }
+    }
+
+    pub fn with_completed(self, completed: NaiveDate) -> Self {
+        use DateRecord::*;
+        match self {
+            CompletedCreated(_, crea) => CompletedCreated(completed, crea),
+            Created(crea) => CompletedCreated(completed, crea),
+            NoDate => CompletedCreated(completed, completed)
+        }
+    }
+
+    pub fn without_completed(self) -> Self {
+        use DateRecord::*;
+        match self {
+            CompletedCreated(_, crea) => Created(crea),
+            other => other,
+        }
+    }
+
+    pub fn set_created(&mut self, created: NaiveDate) {
+        *self = self.with_created(created)
+    }
+
+    pub fn set_completed(&mut self, completed: NaiveDate) {
+        *self = self.with_completed(completed)
+    }
+
+    pub fn set_not_completed(&mut self) {
+        *self = self.without_completed()
+    }
+}
+
+impl DescriptionToken {
+    fn to_string_colored(&self) -> String {
+        let plain_string = self.to_string();
+        use DescriptionToken::*;
+        match self {
+            Project(_) => plain_string.bold().to_string(),
+            Context(_) => plain_string.italic().to_string(),
+            Meta(..) => plain_string.dimmed().to_string(),
+            Other(_) => plain_string,
+        }
+    }
+}
+
+
+impl Deref for TodoTxtFile {
+    type Target = Vec<TodoTxtTask>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tasks
+    }
+}
+
+impl DerefMut for TodoTxtFile {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.tasks
+    }
+}
+
+impl Display for DescriptionToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use DescriptionToken::*;
+        match self {
+            Project(s) => write!(f, "+{}", s),
+            Context(s) => write!(f, "@{}", s),
+            Meta(k, v) => write!(f, "{}:{}", k, v),
+            Other(s) => s.fmt(f),
+        }
+    }
+}
+
+impl Display for DateRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use DateRecord::*;
+        match self {
+            Created(created) => write!(f, "{:0>2}-{:0>2}-{:0>2} ", created.year(), created.month(), created.day()),
+            CompletedCreated(completed, created) => write!(f, "{:0>4}-{:0>2}-{:0>2} {:0>4}-{:0>2}-{:0>2} ",
+                completed.year(), completed.month(), completed.day(),
+                created.year(), created.month(), created.day()),
+            NoDate => Ok(()),
+        }
+    }
+}
+
+impl Display for TodoTxtTask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.completed() {
+            write!(f, "x ")?;
+        }
+
+        if let Some(prio) = self.priority {
+            write!(f, "({}) ", prio)?;
+        }
+
+        write!(f, "{} ", self.dates)?;
+
+        for token in &self.description {
+            token.fmt(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+
+fn parse_date(input: &str) -> ToroResult<NaiveDate> {
+    let mut parts = input.splitn(3, "-");
+
+    let year_str = parts.next().ok_or_else(|| ToroError::DateInputError(input.to_owned()))?;
+    let month_str = parts.next().ok_or_else(|| ToroError::DateInputError(input.to_owned()))?;
+    let day_str = parts.next().ok_or_else(|| ToroError::DateInputError(input.to_owned()))?;
+
+    let year = str::parse(year_str).map_err(|_| ToroError::DateInputError(input.to_owned()))?;
+    let month = str::parse(month_str).map_err(|_| ToroError::DateInputError(input.to_owned()))?;
+    let day = str::parse(day_str).map_err(|_| ToroError::DateInputError(input.to_owned()))?;
+
+    NaiveDate::default()
+        .with_year(year)
+        .ok_or_else(|| ToroError::DateInputError(input.to_owned()))?
+        .with_month(month)
+        .ok_or_else(|| ToroError::DateInputError(input.to_owned()))?
+        .with_day(day)
+        .ok_or_else(|| ToroError::DateInputError(input.to_owned()))
+}
