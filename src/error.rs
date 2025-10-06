@@ -41,13 +41,3 @@ pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {
         },
     }
 }
-
-pub fn warn<T, E: Display>(result: Result<T, E>, default: T) -> T {
-    match result {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("{} {}", "Warning:".yellow(), e);
-            default
-        },
-    }
-}

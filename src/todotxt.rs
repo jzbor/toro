@@ -2,7 +2,7 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::fs;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
@@ -45,9 +45,9 @@ pub struct TodoTxtTask {
     priority: Option<char>,
     dates: DateRecord,
     description: Vec<DescriptionToken>,
-    project: Option<String>,
-    context: Vec<String>,
-    metadata: BTreeMap<String, String>
+    _project: Option<String>,
+    _context: Vec<String>,
+    _metadata: BTreeMap<String, String>
 }
 
 #[derive(Parser)]
@@ -69,12 +69,12 @@ impl TodoTxtFile {
         let mut tasks = content.lines()
             .map(TodoTxtTask::parse)
             .collect::<ToroResult<Vec<_>>>()?;
-        tasks.sort_by_key(|t| Reverse(t.when_created().unwrap_or(NaiveDate::default())));
+        tasks.sort_by_key(|t| Reverse(t.when_created().unwrap_or_default()));
         tasks.sort_by_key(|t| t.priority().unwrap_or('['));
         tasks.sort_by_key(|t| t.completed());
         Ok(TodoTxtFile {
             location: path,
-            tasks: tasks,
+            tasks,
         })
     }
 
@@ -94,13 +94,13 @@ impl TodoTxtFile {
 
     pub fn filtered_tasks(&self, filter: Filter) -> Vec<&TodoTxtTask> {
         self.tasks.iter()
-            .filter(|t| filter.approves(*t))
+            .filter(|t| filter.approves(t))
             .collect()
     }
 
     pub fn filtered_tasks_mut(&mut self, filter: Filter) -> Vec<&mut TodoTxtTask> {
         self.tasks.iter_mut()
-            .filter(|t| filter.approves(*t))
+            .filter(|t| filter.approves(t))
             .collect()
     }
 
@@ -164,8 +164,7 @@ impl TodoTxtTask {
 
         let priority = if next_rule_is(&inner, Rule::priority) {
             let c = inner.next().unwrap()
-                .as_str().chars()
-                .skip(1).next()
+                .as_str().chars().nth(1)
                 .unwrap();
             Some(c)
         } else {
@@ -222,7 +221,7 @@ impl TodoTxtTask {
             }
         }
 
-        Ok(TodoTxtTask { completed, priority, dates, description, project, context, metadata })
+        Ok(TodoTxtTask { completed, priority, dates, description, _project: project, _context: context, _metadata: metadata })
     }
 
     pub fn to_string_fancy(&self, columns: ColumnSelector) -> String {
@@ -285,13 +284,6 @@ impl TodoTxtTask {
         self.dates.created()
     }
 
-    pub fn when_due(&self) -> ToroResult<Option<NaiveDate>> {
-        match self.metadata.get("due") {
-            Some(val) => Ok(Some(parse_date(val)?)),
-            None => Ok(None),
-        }
-    }
-
     pub fn complete(&mut self) {
         self.completed = true;
         self.dates.set_completed(Utc::now().naive_local().into())
@@ -304,13 +296,6 @@ impl TodoTxtTask {
 
     pub fn priority(&self) -> Option<char> {
         self.priority
-    }
-
-    pub fn description(&self) -> String {
-        self.description.iter()
-            .map(|d| d.to_string())
-            .collect::<Vec<String>>()
-            .join("")
     }
 
     pub fn description_fancy(&self) -> String {
@@ -340,10 +325,6 @@ impl DateRecord {
             CompletedCreated(date, _) => Some(date),
             _ => None,
         }
-    }
-
-    pub fn is_none(&self) -> bool {
-        *self == DateRecord::NoDate
     }
 
     pub fn with_created(self, created: NaiveDate) -> Self {

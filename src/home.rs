@@ -1,18 +1,12 @@
 use std::path::PathBuf;
 
-use crate::error::{self, ToroError, ToroResult};
+use crate::error::{ToroError, ToroResult};
 use crate::todotxt::TodoTxtFile;
 
 const DATA_FILE_NAME: &str = "todo.txt";
 
 fn xdg_dirs() -> xdg::BaseDirectories {
     xdg::BaseDirectories::with_prefix("toro")
-}
-
-pub fn data_path() -> Option<PathBuf> {
-    xdg_dirs()
-        .find_data_file(DATA_FILE_NAME)
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
 }
 
 fn load_data_file() -> ToroResult<TodoTxtFile> {

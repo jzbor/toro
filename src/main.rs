@@ -1,6 +1,4 @@
-use std::path::PathBuf;
-
-use clap::{ArgAction, Parser};
+use clap::Parser;
 
 use crate::commands::Command;
 
