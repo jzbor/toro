@@ -55,6 +55,14 @@ impl Command for DoneCommand {
 
         file.store()?;
 
+        if config.git.auto_commit {
+            let state = if self.undo { "pending" } else { "completed" };
+            file.commit(&format!("Marked {} tasks as \"{}\"", nrs.len(), state))?;
+        }
+        if config.git.auto_sync {
+            file.sync()?;
+        }
+
         Ok(())
     }
 }

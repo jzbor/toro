@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
+use std::ffi::OsStr;
 use std::fmt::Display;
 use std::fs;
 use std::hash::Hash;
@@ -16,6 +17,7 @@ use pest_derive::Parser;
 
 use crate::error::{ToroError, ToroResult};
 use crate::filter::{ColumnSelector, Filter};
+use crate::exec::*;
 use crate::interaction::*;
 
 #[derive(Debug)]
@@ -66,26 +68,69 @@ impl TodoTxtFile {
     pub fn load(path: PathBuf) -> ToroResult<Self> {
         let content = fs::read_to_string(&path)
             .map_err(|e| ToroError::NamedIOError(path.clone(), e))?;
-        let mut tasks = content.lines()
+        let tasks = content.lines()
             .map(TodoTxtTask::parse)
             .collect::<ToroResult<Vec<_>>>()?;
-        tasks.sort_by_key(|t| Reverse(t.when_created().unwrap_or_default()));
-        tasks.sort_by_key(|t| t.priority().unwrap_or('['));
-        tasks.sort_by_key(|t| t.completed());
-        Ok(TodoTxtFile {
+
+        let mut file = TodoTxtFile {
             location: path,
             tasks,
-        })
+        };
+
+        file.resort();
+        Ok(file)
     }
 
-    pub fn store(&self) -> ToroResult<()> {
+    pub fn store(&mut self) -> ToroResult<()> {
+        self.resort();
         let mut file = fs::File::create(&self.location)?;
         let content = self.iter()
             .map(|t| t.to_string())
             .collect::<Vec<_>>()
             .join("\n");
-        file.write_all(content.as_bytes())
-            .map_err(|e| e.into())
+        file.write_all(content.as_bytes())?;
+
+        Ok(())
+    }
+
+    pub fn git(&self, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> ToroResult<()> {
+        let orig: Vec<_> = args.into_iter().collect();
+        let mut args: VecDeque<_> = orig.iter().map(|a| a.as_ref()).collect();
+        let local = PathBuf::from(".");
+        let path = self.location.parent().unwrap_or(&local);
+        args.push_front(path.as_ref());
+        args.push_front("-C".as_ref());
+        exec("git", args)
+    }
+
+    pub fn dirty(&self) -> bool {
+        self.git(&["diff-index", "--quiet", "HEAD"])
+            .is_err_and(|e| e.is_external_command_failed())
+    }
+
+    pub fn commit(&self, msg: &str) -> ToroResult<()> {
+        if self.dirty() {
+            eprintln!("\nCommitting changes...");
+            let full_msg = format!("[toro] {}", msg);
+            self.git(&["commit", "-am", &full_msg])?;
+        } else {
+            eprintln!("\nNothing to commit.");
+        }
+        Ok(())
+
+    }
+
+    pub fn sync(&self) -> ToroResult<()> {
+        eprintln!("\nSyncing git repo");
+        self.git(&["pull", "--rebase"])?;
+        self.git(&["push"])?;
+        Ok(())
+    }
+
+    pub fn resort(&mut self) {
+        self.tasks.sort_by_key(|t| Reverse(t.when_created().unwrap_or_default()));
+        self.tasks.sort_by_key(|t| t.priority().unwrap_or('['));
+        self.tasks.sort_by_key(|t| t.completed());
     }
 
     pub fn location(&self) -> &PathBuf {
@@ -143,7 +188,7 @@ impl TodoTxtFile {
 }
 
 impl TodoTxtTask {
-    fn parse(line: &str) -> ToroResult<Self> {
+    pub fn parse(line: &str) -> ToroResult<Self> {
         let parsed = TodoTxtParser::parse(Rule::full_task, line)
             .map_err(|e| ToroError::SyntaxError(Box::new(e)))?
             .next().unwrap()

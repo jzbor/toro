@@ -31,7 +31,7 @@
       ];
       postFixup = ''
         wrapProgram $out/bin/toro \
-          --set PATH ${pkgs.lib.makeBinPath [ pkgs.git ]}
+          --prefix PATH ${pkgs.lib.makeBinPath [ pkgs.git pkgs.openssh]}
       '';
       postInstall = ''
         echo "Generating man pages"

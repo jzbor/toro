@@ -121,7 +121,7 @@ impl Filter {
         let description = task.description();
 
         for pattern in &self.patterns {
-            if !description.contains(pattern) {
+            if !description.to_lowercase().contains(&pattern.to_lowercase()) {
                 return false;
             }
         }

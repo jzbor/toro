@@ -10,7 +10,7 @@ pub struct EditCommand {
 }
 
 impl Command for EditCommand {
-    fn exec(self, config: Config) -> ToroResult<()> {
+    fn exec(self, _: Config) -> ToroResult<()> {
         let file = home::load_or_create_data_file()?;
         let path = file.location();
         let editor = env::var("EDITOR")

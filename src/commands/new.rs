@@ -1,0 +1,36 @@
+use colored::Colorize;
+
+use crate::commands::Command;
+use crate::error::ToroResult;
+use crate::todotxt::TodoTxtTask;
+use crate::{home, Config};
+use crate::interaction::*;
+
+#[derive(clap::Args, Debug)]
+pub struct NewCommand {
+    /// New task in todo.txt format
+    text: String
+}
+
+impl Command for NewCommand {
+    fn exec(self, config: Config) -> ToroResult<()> {
+        let mut file = home::load_or_create_data_file()?;
+        let task = TodoTxtTask::parse(&self.text)?;
+        let description = task.description_fancy().color(SELECTION_COLOR);
+
+        println!("Creating new task \"{}\".", description);
+
+        file.push(task);
+        file.store()?;
+
+        if config.git.auto_commit {
+            file.commit(&format!("Created new task \"{}\"", description))?;
+        }
+        if config.git.auto_sync {
+            file.sync()?;
+        }
+
+
+        Ok(())
+    }
+}

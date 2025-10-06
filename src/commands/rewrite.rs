@@ -8,8 +8,18 @@ pub struct RewriteCommand {
 
 impl Command for RewriteCommand {
     fn exec(self, config: Config) -> ToroResult<()> {
-        let file = home::load_or_create_data_file()?;
-        file.store()
+        let mut file = home::load_or_create_data_file()?;
+        file.store()?;
+
+        if config.git.auto_commit {
+            file.commit("Rewrite todo.txt file")?;
+        }
+        if config.git.auto_sync {
+            file.sync()?;
+        }
+
+
+        Ok(())
     }
 }
 

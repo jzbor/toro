@@ -2,7 +2,6 @@ use crate::commands::Command;
 use crate::error::ToroResult;
 use crate::filter::{ColumnSelector, Filter};
 use crate::{home, Config};
-use crate::interaction::announce;
 
 #[derive(clap::Args, Debug)]
 pub struct ViewCommand {
@@ -26,7 +25,6 @@ impl Command for ViewCommand {
         let columns = config.columns.update_with_cmdline(self.columns);
 
         let file = home::load_or_create_data_file()?;
-        announce(&format!("Tasks ({})", file.stats_fancy()));
         file.list(self.numbered, !self.top_to_bottom, columns, Some(&self.filter));
         Ok(())
     }

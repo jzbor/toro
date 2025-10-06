@@ -13,7 +13,7 @@ pub const PRIORITY_B_COLOR: Color = Color::BrightYellow;
 
 
 pub fn announce(s: &str) {
-    println!("\n{}", format!("=> {s}").green());
+    println!("\n{}\n", format!("=> {s}").green());
 }
 
 pub fn select_tasks(file: &TodoTxtFile, columns: ColumnSelector, filter_opt: Option<&Filter>) -> Vec<usize> {
