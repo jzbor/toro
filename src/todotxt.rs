@@ -2,6 +2,8 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::fs;
+use std::hash::{Hash, Hasher};
+use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
@@ -13,6 +15,8 @@ use pest_derive::Parser;
 
 
 use crate::error::{ToroError, ToroResult};
+use crate::filter::{ColumnSelector, Filter};
+use crate::interaction::*;
 
 #[derive(Debug)]
 pub struct TodoTxtFile {
@@ -20,14 +24,14 @@ pub struct TodoTxtFile {
     tasks: Vec<TodoTxtTask>,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd)]
+#[derive(Hash, Debug, Clone, Copy, Eq, PartialEq, PartialOrd)]
 pub enum DateRecord {
     Created(NaiveDate),
     CompletedCreated(NaiveDate, NaiveDate),
     NoDate
 }
 
-#[derive(Debug, Clone)]
+#[derive(Hash, Debug, Clone)]
 pub enum DescriptionToken {
     Project(String),
     Context(String),
@@ -72,6 +76,69 @@ impl TodoTxtFile {
             location: path,
             tasks: tasks,
         })
+    }
+
+    pub fn store(&self) -> ToroResult<()> {
+        let mut file = fs::File::create(&self.location)?;
+        let content = self.iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        file.write_all(content.as_bytes())
+            .map_err(|e| e.into())
+    }
+
+    pub fn location(&self) -> &PathBuf {
+        &self.location
+    }
+
+    pub fn filtered_tasks(&self, filter: Filter) -> Vec<&TodoTxtTask> {
+        self.tasks.iter()
+            .filter(|t| filter.approves(*t))
+            .collect()
+    }
+
+    pub fn filtered_tasks_mut(&mut self, filter: Filter) -> Vec<&mut TodoTxtTask> {
+        self.tasks.iter_mut()
+            .filter(|t| filter.approves(*t))
+            .collect()
+    }
+
+    pub fn list(&self, numbered: bool, reverse: bool, columns: ColumnSelector, filter_opt: Option<Filter>) -> usize {
+        let tasks = if let Some(filter) = filter_opt {
+            self.filtered_tasks(filter)
+        } else {
+            self.tasks.iter().collect()
+        };
+
+        let ntasks = tasks.len();
+        let enumerated = if reverse {
+            Box::new(tasks.into_iter().enumerate().rev()) as Box<dyn Iterator<Item = (usize, &TodoTxtTask)>>
+        } else {
+            Box::new(tasks.into_iter().enumerate()) as Box<dyn Iterator<Item = (usize, &TodoTxtTask)>>
+        };
+
+        if numbered {
+            let max_width = ntasks.to_string().len();
+            for (i, task) in enumerated {
+                println!("{} {}", format!("[{: >width$}]", i + 1, width = max_width).color(SELECTION_COLOR),
+                    task.to_string_fancy(columns));
+            }
+        } else {
+            for (_, task) in enumerated {
+                println!("{}", task.to_string_fancy(columns));
+            }
+        }
+
+        ntasks
+    }
+
+    pub fn stats_fancy(&self) -> String {
+        format!("{}/{}/{}",
+            self.tasks.iter().filter(|t| !t.completed()).count().to_string().color(PENDING_COLOR),
+            self.tasks.iter().filter(|t| t.completed()).count().to_string().color(COMPLETED_COLOR),
+            self.tasks.len().to_string().color(SELECTION_COLOR),
+        )
     }
 }
 
@@ -158,26 +225,46 @@ impl TodoTxtTask {
         Ok(TodoTxtTask { completed, priority, dates, description, project, context, metadata })
     }
 
-    pub fn to_string_colored(&self) -> String {
+    pub fn to_string_fancy(&self, columns: ColumnSelector) -> String {
         let mut s = String::new();
 
-        if self.completed() {
-            s.push_str("x ");
-        } else {
-            s.push_str("  ");
+        if columns.completed {
+            if self.completed() {
+                s.push_str("x ");
+            } else {
+                s.push_str("  ");
+            }
         }
 
-        if let Some(prio) = self.priority {
-            s.push_str(&format!("({}) ", prio));
-        } else {
-            s.push_str("    ");
+        if columns.priority {
+            if let Some(prio) = self.priority {
+                s.push_str(&format!("({}) ", prio));
+            } else {
+                s.push_str("    ");
+            }
         }
 
-        s.push_str(&format!("{:<22} ", self.dates.to_string()));
+        if columns.completion_date {
+            let date_str = if let Some(date) = self.when_completed() {
+                format!("{:0>4}-{:0>2}-{:0>2}", date.year(), date.month(), date.day())
+            } else {
+                String::new()
+            };
 
-        for token in &self.description {
-            s.push_str(&token.to_string_colored());
+            s.push_str(&format!("{:<10} ", date_str));
         }
+
+        if columns.creation_date {
+            let date_str = if let Some(date) = self.when_created() {
+                format!("{:0>4}-{:0>2}-{:0>2}", date.year(), date.month(), date.day())
+            } else {
+                String::new()
+            };
+
+            s.push_str(&format!("{:<10} ", date_str));
+        }
+
+        s.push_str(&self.description_fancy());
 
         if self.completed() {
             s.strikethrough().to_string()
@@ -218,6 +305,23 @@ impl TodoTxtTask {
     pub fn priority(&self) -> Option<char> {
         self.priority
     }
+
+    pub fn description(&self) -> String {
+        self.description.iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<String>>()
+            .join("")
+    }
+
+    pub fn description_fancy(&self) -> String {
+        let mut s = String::new();
+
+        for token in &self.description {
+            s.push_str(&token.to_string_colored());
+        }
+
+        s
+    }
 }
 
 impl DateRecord {
@@ -233,9 +337,8 @@ impl DateRecord {
     pub fn completed(&self) -> Option<NaiveDate> {
         use DateRecord::*;
         match *self {
-            Created(date) => Some(date),
-            CompletedCreated(_, date) => Some(date),
-            NoDate => None,
+            CompletedCreated(date, _) => Some(date),
+            _ => None,
         }
     }
 
@@ -325,7 +428,7 @@ impl Display for DateRecord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use DateRecord::*;
         match self {
-            Created(created) => write!(f, "{:0>2}-{:0>2}-{:0>2} ", created.year(), created.month(), created.day()),
+            Created(created) => write!(f, "{:0>4}-{:0>2}-{:0>2} ", created.year(), created.month(), created.day()),
             CompletedCreated(completed, created) => write!(f, "{:0>4}-{:0>2}-{:0>2} {:0>4}-{:0>2}-{:0>2} ",
                 completed.year(), completed.month(), completed.day(),
                 created.year(), created.month(), created.day()),
@@ -354,6 +457,14 @@ impl Display for TodoTxtTask {
     }
 }
 
+impl Hash for TodoTxtTask {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.completed.hash(state);
+        self.priority.hash(state);
+        self.dates.hash(state);
+        self.description.hash(state);
+    }
+}
 
 fn parse_date(input: &str) -> ToroResult<NaiveDate> {
     let mut parts = input.splitn(3, "-");

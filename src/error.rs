@@ -24,6 +24,12 @@ pub enum ToroError {
 
     #[error("Data file not found")]
     DataFileNotFound(),
+
+    #[error("External command '{0}' failed")]
+    ExternalCommandFailed(String),
+
+    #[error("Environment variable '{0}' required, but not defined")]
+    MissingEnvVar(&'static str),
 }
 
 pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {

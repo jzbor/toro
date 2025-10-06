@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{ArgAction, Parser};
 
 use crate::commands::Command;
 
@@ -8,6 +8,9 @@ mod home;
 mod commands;
 mod error;
 mod todotxt;
+mod exec;
+mod filter;
+mod interaction;
 
 /// CLI Client to manage a todo.txt list
 #[derive(Parser)]
@@ -20,25 +23,27 @@ pub struct Args {
 #[derive(clap::Subcommand)]
 enum Subcommand {
     /// List all pending tasks
-    List(commands::list::ListCommand)
+    View(commands::view::ViewCommand),
+
+    /// Open todo.txt file in an editor
+    Edit(commands::edit::EditCommand),
+
+    /// Load and write back todo.txt file
+    Rewrite(commands::rewrite::RewriteCommand),
+
+    /// Mark task as completed
+    Done(commands::done::DoneCommand),
 }
 
 fn main() {
-    // let mut test = error::resolve(todotxt::TodoTxtFile::load(PathBuf::from("./test.txt")));
-    // test.sort_by_key(|t| t.priority().unwrap_or('['));
-    // test.sort_by_key(|t| t.completed());
-    // println!();
-    // for task in test.iter() {
-    //     println!("{}", task.to_string_colored());
-    // }
-
-    // return;
-
     let args = Args::parse();
 
     use Subcommand::*;
     let result = match args.subcommand {
-        List(cmd) => cmd.exec(),
+        View(cmd) => cmd.exec(),
+        Edit(cmd) => cmd.exec(),
+        Rewrite(cmd) => cmd.exec(),
+        Done(cmd) => cmd.exec(),
     };
 
     error::resolve(result)
