@@ -1,0 +1,59 @@
+{
+  "nodes": {
+    "cf": {
+      "locked": {
+        "lastModified": 1756852014,
+        "narHash": "sha256-OrfTRBwerFrlK1fbWhu1eW40XUrOdE/Rq7IyxthEpcA=",
+        "owner": "jzbor",
+        "repo": "cornflakes",
+        "rev": "7ef6d8be9b66f46cee3af1d5797e01f301b93149",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jzbor",
+        "repo": "cornflakes",
+        "type": "github"
+      }
+    },
+    "crane": {
+      "locked": {
+        "lastModified": 1759691647,
+        "narHash": "sha256-OnyPw3KaXL909I+FNyD6jfkAP/gdL/K0iitMHxo7ieM=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "1e7905b1eb1b551aade75169940557b6c51ed920",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1759381078,
+        "narHash": "sha256-gTrEEp5gEspIcCOx9PD8kMaF1iEmfBcTbO0Jag2QhQs=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "7df7ff7d8e00218376575f0acdcc5d66741351ee",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "cf": "cf",
+        "crane": "crane",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

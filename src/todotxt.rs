@@ -92,19 +92,19 @@ impl TodoTxtFile {
         &self.location
     }
 
-    pub fn filtered_tasks(&self, filter: Filter) -> Vec<&TodoTxtTask> {
+    pub fn filtered_tasks(&self, filter: &Filter) -> Vec<&TodoTxtTask> {
         self.tasks.iter()
             .filter(|t| filter.approves(t))
             .collect()
     }
 
-    pub fn filtered_tasks_mut(&mut self, filter: Filter) -> Vec<&mut TodoTxtTask> {
+    pub fn filtered_tasks_mut(&mut self, filter: &Filter) -> Vec<&mut TodoTxtTask> {
         self.tasks.iter_mut()
             .filter(|t| filter.approves(t))
             .collect()
     }
 
-    pub fn list(&self, numbered: bool, reverse: bool, columns: ColumnSelector, filter_opt: Option<Filter>) -> usize {
+    pub fn list(&self, numbered: bool, reverse: bool, columns: ColumnSelector, filter_opt: Option<&Filter>) -> usize {
         let tasks = if let Some(filter) = filter_opt {
             self.filtered_tasks(filter)
         } else {
@@ -266,10 +266,14 @@ impl TodoTxtTask {
         s.push_str(&self.description_fancy());
 
         if self.completed() {
-            s.strikethrough().to_string()
-        } else {
-            s
+            s = s.strikethrough().to_string();
+        } else if self.priority() == Some('A') {
+            s = s.color(PRIORITY_A_COLOR).to_string();
+        } else if self.priority() == Some('B') {
+            s = s.color(PRIORITY_B_COLOR).to_string();
         }
+
+        s
     }
 
     pub fn completed(&self) -> bool {
@@ -296,6 +300,13 @@ impl TodoTxtTask {
 
     pub fn priority(&self) -> Option<char> {
         self.priority
+    }
+
+    pub fn description(&self) -> String {
+        self.description.iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join("")
     }
 
     pub fn description_fancy(&self) -> String {

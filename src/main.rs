@@ -1,6 +1,7 @@
 use clap::Parser;
 
 use crate::commands::Command;
+use crate::filter::ColumnSelector;
 
 mod home;
 mod commands;
@@ -31,17 +32,44 @@ enum Subcommand {
 
     /// Mark task as completed
     Done(commands::done::DoneCommand),
+
+    /// Generate man pages
+    #[clap(hide = true)]
+    Man(commands::man::ManCommand),
+
+    /// Generate shell completions
+    #[clap(hide = true)]
+    Completions(commands::completions::CompletionsCommand),
 }
+
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+struct Config {
+    columns: ColumnSelector,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            columns: ColumnSelector::default(),
+        }
+    }
+}
+
 
 fn main() {
     let args = Args::parse();
+    let config = error::resolve(home::load_config())
+        .unwrap_or_default();
 
     use Subcommand::*;
     let result = match args.subcommand {
-        View(cmd) => cmd.exec(),
-        Edit(cmd) => cmd.exec(),
-        Rewrite(cmd) => cmd.exec(),
-        Done(cmd) => cmd.exec(),
+        View(cmd) => cmd.exec(config),
+        Edit(cmd) => cmd.exec(config),
+        Rewrite(cmd) => cmd.exec(config),
+        Done(cmd) => cmd.exec(config),
+        Man(cmd) => cmd.exec(config),
+        Completions(cmd) => cmd.exec(config),
     };
 
     error::resolve(result)

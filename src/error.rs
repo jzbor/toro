@@ -30,6 +30,15 @@ pub enum ToroError {
 
     #[error("Environment variable '{0}' required, but not defined")]
     MissingEnvVar(&'static str),
+
+    #[error("Invalid config file\n{0}")]
+    ConfigSyntaxError(#[from] toml::de::Error),
+
+    #[error("{0}")]
+    ManError(String),
+
+    #[error("{0}")]
+    CompletionsError(String),
 }
 
 pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {
