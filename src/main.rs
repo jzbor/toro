@@ -48,6 +48,9 @@ enum Subcommand {
     /// Pull, rebase and push git repository
     Sync(commands::sync::SyncCommand),
 
+    /// Update one or multiple tasks
+    Update(commands::update::UpdateCommand),
+
     /// List all pending tasks
     View(commands::view::ViewCommand),
 }
@@ -93,12 +96,13 @@ fn main() {
         Completions(cmd) => cmd.exec(config),
         Done(cmd) => cmd.exec(config),
         Edit(cmd) => cmd.exec(config),
+        Git(cmd) => cmd.exec(config),
         Man(cmd) => cmd.exec(config),
         New(cmd) => cmd.exec(config),
         Rewrite(cmd) => cmd.exec(config),
-        View(cmd) => cmd.exec(config),
-        Git(cmd) => cmd.exec(config),
         Sync(cmd) => cmd.exec(config),
+        Update(cmd) => cmd.exec(config),
+        View(cmd) => cmd.exec(config),
     };
 
     error::resolve(result)

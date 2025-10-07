@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 use chrono::{Datelike, NaiveDate, Utc};
 use colored::Colorize;
-use pest::iterators::Pairs;
+use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 use pest_derive::Parser;
 
@@ -47,9 +47,6 @@ pub struct TodoTxtTask {
     priority: Option<char>,
     dates: DateRecord,
     description: Vec<DescriptionToken>,
-    _project: Option<String>,
-    _context: Vec<String>,
-    _metadata: BTreeMap<String, String>
 }
 
 #[derive(Parser)]
@@ -236,37 +233,36 @@ impl TodoTxtTask {
 
         assert!(next_rule_is(&inner, Rule::description));
         let description_pair = inner.next().unwrap();
-        // let description = description_pair.as_str().to_owned();
-        let description_inner = description_pair.into_inner();
+        let description = Self::parse_description(description_pair);
 
+        Ok(TodoTxtTask { completed, priority, dates, description })
+    }
+
+    fn parse_description(pair: Pair<Rule>) -> Vec<DescriptionToken> {
+        let description_inner = pair.into_inner();
         let mut description = Vec::new();
-        let mut project = None;
-        let mut context = Vec::new();
-        let mut metadata = BTreeMap::new();
+
         for pair in description_inner {
             if pair.as_rule() == Rule::other {
                 let val = pair.as_str().to_owned();
                 description.push(DescriptionToken::Other(val));
             } else if pair.as_rule() == Rule::project {
                 let val = pair.into_inner().next().unwrap().as_str().to_owned();
-                project = Some(val.clone());
                 description.push(DescriptionToken::Project(val));
             } else if pair.as_rule() == Rule::context {
                 let val = pair.into_inner().next().unwrap().as_str().to_owned();
-                context.push(val.clone());
                 description.push(DescriptionToken::Context(val));
             } else if pair.as_rule() == Rule::meta {
                 let mut split = pair.as_str().split(":");
                 let key = split.next().unwrap();
                 let value = split.next().unwrap();
-                metadata.insert(key.to_owned(), value.to_owned());
                 description.push(DescriptionToken::Meta(key.to_owned(), value.to_owned()));
             } else {
                 panic!("Unexpected pair ({:?})", pair.as_rule());
             }
         }
 
-        Ok(TodoTxtTask { completed, priority, dates, description, _project: project, _context: context, _metadata: metadata })
+        description
     }
 
     pub fn to_string_fancy(&self, columns: ColumnSelector) -> String {
@@ -343,8 +339,39 @@ impl TodoTxtTask {
         self.dates.set_not_completed()
     }
 
+    pub fn set_completed(&mut self, val: bool) {
+        if val {
+            self.complete();
+        } else {
+            self.uncomplete();
+        }
+    }
+
+    pub fn set_completion_date(&mut self, date_opt: Option<NaiveDate>) {
+        match date_opt {
+            Some(date) => self.dates.set_completed(date),
+            None => self.dates.set_not_completed(),
+        }
+    }
+
+    pub fn set_creation_date(&mut self, date_opt: Option<NaiveDate>) {
+        use DateRecord::*;
+        match date_opt {
+            Some(date) => self.dates.set_created(date),
+            None => self.dates = match self.dates {
+                Created(_) => NoDate,
+                CompletedCreated(completed, _) => CompletedCreated(completed, completed),
+                NoDate => NoDate,
+            },
+        }
+    }
+
     pub fn priority(&self) -> Option<char> {
         self.priority
+    }
+
+    pub fn set_priority(&mut self, priority: Option<char>) {
+        self.priority = priority;
     }
 
     pub fn description(&self) -> String {
@@ -362,6 +389,15 @@ impl TodoTxtTask {
         }
 
         s
+    }
+
+    pub fn set_description(&mut self, description: &str) -> ToroResult<()> {
+        let parsed = TodoTxtParser::parse(Rule::full_description, description)
+            .map_err(|e| ToroError::SyntaxError(Box::new(e)))?
+            .next().unwrap()
+            .into_inner().next().unwrap();
+        self.description = Self::parse_description(parsed);
+        Ok(())
     }
 }
 
@@ -503,7 +539,7 @@ impl Hash for TodoTxtTask {
     }
 }
 
-fn parse_date(input: &str) -> ToroResult<NaiveDate> {
+pub fn parse_date(input: &str) -> ToroResult<NaiveDate> {
     let mut parts = input.splitn(3, "-");
 
     let year_str = parts.next().ok_or_else(|| ToroError::DateInputError(input.to_owned()))?;

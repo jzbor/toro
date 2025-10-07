@@ -13,12 +13,7 @@
     craneLib = crane.mkLib pkgs;
   in {
     packages.default = craneLib.buildPackage rec {
-      # srcFilter = path: type: (builtins.match ".*pest$" path != null) || (craneLib.filterCargoSources path type);
-      src = nixpkgs.lib.cleanSourceWith {
-        src = ./.;
-        # filter = srcFilter;
-        name = "source";
-      };
+      src = ./.;
       strictDeps = true;
 
       cargoArtifacts = craneLib.buildDepsOnly {
@@ -32,6 +27,7 @@
       postFixup = ''
         wrapProgram $out/bin/toro \
           --prefix PATH ${pkgs.lib.makeBinPath [ pkgs.git pkgs.openssh]}
+        ln -s $out/bin/toro $out/bin/törö
       '';
       postInstall = ''
         echo "Generating man pages"

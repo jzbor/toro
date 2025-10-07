@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::io::Write;
 
 use colored::{Color, Colorize};
@@ -10,6 +11,49 @@ pub const PENDING_COLOR: Color = Color::BrightBlue;
 pub const SELECTION_COLOR: Color = Color::Yellow;
 pub const PRIORITY_A_COLOR: Color = Color::BrightMagenta;
 pub const PRIORITY_B_COLOR: Color = Color::BrightYellow;
+pub const PRIORITY_COLOR: Color = PRIORITY_A_COLOR;
+pub const COMPLETION_DATE_COLOR: Color = Color::Cyan;
+pub const CREATION_DATE_COLOR: Color = Color::Blue;
+pub const DESCRIPTION_COLOR: Color = SELECTION_COLOR;
+
+
+#[derive(Copy, Clone, Debug)]
+pub enum FieldSelection {
+    Completed,
+    Priority,
+    CompletionDate,
+    CreationDate,
+    Description,
+}
+
+
+impl FieldSelection {
+    pub fn to_string_fancy(self) -> String {
+        use FieldSelection::*;
+        let color = match self {
+            Completed => COMPLETED_COLOR,
+            Priority => PRIORITY_COLOR,
+            CompletionDate => COMPLETION_DATE_COLOR,
+            CreationDate => CREATION_DATE_COLOR,
+            Description => DESCRIPTION_COLOR,
+        };
+        self.to_string().color(color).to_string()
+    }
+}
+
+
+impl Display for FieldSelection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use FieldSelection::*;
+        match self {
+            Completed => write!(f, "completed"),
+            Priority => write!(f, "priority"),
+            CompletionDate => write!(f, "completion-date"),
+            CreationDate => write!(f, "creation-date"),
+            Description => write!(f, "description"),
+        }
+    }
+}
 
 
 pub fn announce(s: &str) {
@@ -21,7 +65,6 @@ pub fn select_tasks(file: &TodoTxtFile, columns: ColumnSelector, filter_opt: Opt
     println!();
 
     loop {
-
         let answer = match ask("Please select one or multiple tasks:") {
             Some(answer) => answer,
             None => return Vec::new(),
@@ -40,6 +83,29 @@ pub fn select_tasks(file: &TodoTxtFile, columns: ColumnSelector, filter_opt: Opt
             None => return nrs,
             Some(nr) => { eprintln!("{}", format!("Out of range: {}", nr + 1).red()); continue },
         }
+    }
+}
+
+pub fn select_field() -> Option<FieldSelection> {
+    loop {
+        use FieldSelection::*;
+        let fields = [ Completed, Priority, CompletionDate, CreationDate, Description ];
+        let fields_label = fields.iter()
+            .map(|f| f.to_string_fancy())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let answer = match ask(&format!("Available fields: {}\nPlease select a field:", fields_label)) {
+            Some(answer) => answer,
+            None => return None,
+        };
+
+        for field in fields {
+            if field.to_string().starts_with(&answer) {
+                return Some(field);
+            }
+        }
+
+        eprintln!("{}", format!("Invalid field: {}", answer).red());
     }
 }
 

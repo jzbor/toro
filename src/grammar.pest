@@ -1,5 +1,6 @@
-full_task 	= { SOI ~ task ~ EOI }
-task 		= { completion_mark? ~ priority? ~ ( completed_date ~ created_date | created_date )? ~ description }
+full_task 		= { SOI ~ task ~ EOI }
+full_description	= { SOI ~ description ~ EOI }
+task 			= { completion_mark? ~ priority? ~ ( completed_date ~ created_date | created_date )? ~ description }
 
 completion_mark	= { "x" }
 priority 	= { "(" ~ ASCII_ALPHA_UPPER ~ ")" }

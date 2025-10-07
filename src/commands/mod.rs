@@ -9,6 +9,7 @@ pub mod man;
 pub mod new;
 pub mod rewrite;
 pub mod sync;
+pub mod update;
 pub mod view;
 
 pub trait Command: clap::Args {
