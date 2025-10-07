@@ -1,5 +1,5 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::fmt::Display;
 use std::fs;
@@ -101,15 +101,15 @@ impl TodoTxtFile {
     }
 
     pub fn dirty(&self) -> bool {
-        self.git(&["diff-index", "--quiet", "HEAD"])
-            .is_err_and(|e| e.is_external_command_failed())
+        self.git(["diff-index", "--quiet", "HEAD"])
+            .is_err_and(|e| matches!(e, ToroError::ExternalCommandFailed(_)))
     }
 
     pub fn commit(&self, msg: &str) -> ToroResult<()> {
         if self.dirty() {
             eprintln!("\nCommitting changes...");
             let full_msg = format!("[toro] {}", msg);
-            self.git(&["commit", "-am", &full_msg])?;
+            self.git(["commit", "-am", &full_msg])?;
         } else {
             eprintln!("\nNothing to commit.");
         }
@@ -119,8 +119,8 @@ impl TodoTxtFile {
 
     pub fn sync(&self) -> ToroResult<()> {
         eprintln!("\nSyncing git repo");
-        self.git(&["pull", "--rebase"])?;
-        self.git(&["push"])?;
+        self.git(["pull", "--rebase"])?;
+        self.git(["push"])?;
         Ok(())
     }
 
@@ -173,14 +173,6 @@ impl TodoTxtFile {
         }
 
         ntasks
-    }
-
-    pub fn stats_fancy(&self) -> String {
-        format!("{}/{}/{}",
-            self.tasks.iter().filter(|t| !t.completed()).count().to_string().color(PENDING_COLOR),
-            self.tasks.iter().filter(|t| t.completed()).count().to_string().color(COMPLETED_COLOR),
-            self.tasks.len().to_string().color(SELECTION_COLOR),
-        )
     }
 }
 

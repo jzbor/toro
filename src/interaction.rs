@@ -94,10 +94,7 @@ pub fn select_field() -> Option<FieldSelection> {
             .map(|f| f.to_string_fancy())
             .collect::<Vec<_>>()
             .join(", ");
-        let answer = match ask(&format!("Available fields: {}\nPlease select a field:", fields_label)) {
-            Some(answer) => answer,
-            None => return None,
-        };
+        let answer = ask(&format!("Available fields: {}\nPlease select a field:", fields_label))?;
 
         for field in fields {
             if field.to_string().starts_with(&answer) {

@@ -41,15 +41,6 @@ pub enum ToroError {
     CompletionsError(String),
 }
 
-impl ToroError {
-    pub fn is_external_command_failed(&self) -> bool {
-        match self {
-            ToroError::ExternalCommandFailed(_) => true,
-            _ => false,
-        }
-    }
-}
-
 pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {
     match result {
         Ok(t) => t,

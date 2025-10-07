@@ -97,18 +97,6 @@ impl ColumnSelector {
 }
 
 impl Filter {
-    pub fn update_with_cmdline(mut self, other: Self) -> Self {
-        if other.include_completed || other.exclude_completed {
-            self.include_completed = other.exclude_completed
-        }
-
-        if other.include_pending || other.exclude_pending {
-            self.include_pending = other.exclude_pending
-        }
-
-        self
-    }
-
     pub fn approves(&self, task: &TodoTxtTask) -> bool {
         if !self.include_completed && task.completed()  {
             return false;

@@ -136,10 +136,8 @@ impl Command for UpdateCommand {
                             .for_each(|t| t.set_creation_date(date))
                     },
                     Description => {
-                        let res: ToroResult<()> = selected.iter_mut()
-                            .map(|t| t.set_description(&answer))
-                            .collect();
-                        if let Err(_) = res {
+                        let res: ToroResult<()> = selected.iter_mut().try_for_each(|t| t.set_description(&answer));
+                        if res.is_err() {
                             eprintln!("Invalid input \"{}\" for description", answer);
                             continue;
                         }
