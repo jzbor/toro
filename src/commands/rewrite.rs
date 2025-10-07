@@ -18,7 +18,6 @@ impl Command for RewriteCommand {
             file.sync()?;
         }
 
-
         Ok(())
     }
 }
