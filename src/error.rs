@@ -39,6 +39,12 @@ pub enum ToroError {
 
     #[error("{0}")]
     CompletionsError(String),
+
+    #[error("{0}")]
+    ReadlineError(#[from] rustyline::error::ReadlineError),
+
+    #[error("Encountered EOF")]
+    EofError(),
 }
 
 pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {

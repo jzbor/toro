@@ -1,8 +1,8 @@
 use std::fmt::Display;
-use std::io::Write;
 
 use colored::{Color, Colorize};
 
+use crate::error::{ToroError, ToroResult};
 use crate::filter::{ColumnSelector, Filter};
 use crate::todotxt::TodoTxtFile;
 
@@ -29,15 +29,7 @@ pub enum FieldSelection {
 
 impl FieldSelection {
     pub fn to_string_fancy(self) -> String {
-        use FieldSelection::*;
-        let color = match self {
-            Completed => COMPLETED_COLOR,
-            Priority => PRIORITY_COLOR,
-            CompletionDate => COMPLETION_DATE_COLOR,
-            CreationDate => CREATION_DATE_COLOR,
-            Description => DESCRIPTION_COLOR,
-        };
-        self.to_string().color(color).to_string()
+        self.to_string().color(self.get_color()).to_string()
     }
 }
 
@@ -55,19 +47,34 @@ impl Display for FieldSelection {
     }
 }
 
+impl FieldSelection {
+    fn get_color(self) -> Color {
+        use FieldSelection::*;
+        match self {
+            Completed => COMPLETED_COLOR,
+            Priority => PRIORITY_COLOR,
+            CompletionDate => COMPLETION_DATE_COLOR,
+            CreationDate => CREATION_DATE_COLOR,
+            Description => DESCRIPTION_COLOR,
+        }
+    }
+}
+
 
 pub fn announce(s: &str) {
     println!("\n{}\n", format!("=> {s}").green());
 }
 
-pub fn select_tasks(file: &TodoTxtFile, columns: ColumnSelector, filter_opt: Option<&Filter>) -> Vec<usize> {
+pub fn select_tasks(rl: &mut rustyline::DefaultEditor, file: &TodoTxtFile,
+        columns: ColumnSelector, filter_opt: Option<&Filter>) -> ToroResult<Vec<usize>> {
     let ntasks = file.list(true, true, columns, filter_opt);
     println!();
 
     loop {
-        let answer = match ask("Please select one or multiple tasks:") {
-            Some(answer) => answer,
-            None => return Vec::new(),
+        let answer = match rl.readline("Please select one or multiple tasks: ") {
+            Ok(answer) => answer,
+            Err(rustyline::error::ReadlineError::Eof) => return Err(ToroError::EofError()),
+            Err(e) => return Err(e.into()),
         };
         let numbers_result = answer.split(" ")
             .filter(|s| !s.is_empty())
@@ -80,13 +87,13 @@ pub fn select_tasks(file: &TodoTxtFile, columns: ColumnSelector, filter_opt: Opt
         };
 
         match nrs.iter().find(|n| **n >= ntasks) {
-            None => return nrs,
+            None => return Ok(nrs),
             Some(nr) => { eprintln!("{}", format!("Out of range: {}", nr + 1).red()); continue },
         }
     }
 }
 
-pub fn select_field() -> Option<FieldSelection> {
+pub fn select_field(rl: &mut rustyline::DefaultEditor) -> ToroResult<FieldSelection> {
     loop {
         use FieldSelection::*;
         let fields = [ Completed, Priority, CompletionDate, CreationDate, Description ];
@@ -94,33 +101,18 @@ pub fn select_field() -> Option<FieldSelection> {
             .map(|f| f.to_string_fancy())
             .collect::<Vec<_>>()
             .join(", ");
-        let answer = ask(&format!("Available fields: {}\nPlease select a field:", fields_label))?;
+        let answer = match rl.readline(&format!("Available fields: {}\nPlease select a field: ", fields_label)) {
+            Ok(answer) => answer,
+            Err(rustyline::error::ReadlineError::Eof) => return Err(ToroError::EofError()),
+            Err(e) => return Err(e.into()),
+        };
 
         for field in fields {
             if field.to_string().starts_with(&answer) {
-                return Some(field);
+                return Ok(field);
             }
         }
 
         eprintln!("{}", format!("Invalid field: {}", answer).red());
-    }
-}
-
-pub fn ask(question: &str) -> Option<String> {
-    loop {
-        print!("{question} ");
-        let _ = std::io::stdout().flush();
-
-        let mut answer = String::new();
-        match std::io::stdin().read_line(&mut answer) {
-            Ok(_) => (),
-            Err(_) => continue,
-        };
-
-        match answer.as_str() {
-            "" => return None,
-            "\n" | "\r\n" => continue,
-            other => return Some(other.trim().to_owned()),
-        }
     }
 }

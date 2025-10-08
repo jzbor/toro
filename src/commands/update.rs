@@ -2,7 +2,7 @@ use colored::Colorize;
 use chrono::{Datelike, NaiveDate};
 
 use crate::commands::Command;
-use crate::error::ToroResult;
+use crate::error::{ToroError, ToroResult};
 use crate::filter::{ColumnSelector, Filter};
 use crate::interaction::*;
 use crate::todotxt::parse_date;
@@ -21,13 +21,15 @@ impl Command for UpdateCommand {
     fn exec(self, config: Config) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
         let columns = config.columns.update_with_cmdline(self.columns);
+        let mut rl = rustyline::DefaultEditor::new()?;
 
         loop {
             announce("Select tasks to update");
-            let nrs = select_tasks(&file, columns, Some(&self.filter));
-            if nrs.is_empty() {
-                return Ok(());
-            }
+            let nrs = match select_tasks(&mut rl, &file, columns, Some(&self.filter)) {
+                Ok(nrs) => nrs,
+                Err(ToroError::EofError()) => return Ok(()),
+                Err(e) => return Err(e.into()),
+            };
 
             let filtered = file.filtered_tasks_mut(&self.filter);
             let mut selected: Vec<_> = filtered.into_iter()
@@ -35,15 +37,20 @@ impl Command for UpdateCommand {
                 .filter_map(|(i, t)| if nrs.contains(&i) { Some(t) } else { None })
                 .collect();
 
+            if selected.len() == 0 {
+                continue;
+            }
+
             println!();
 
-            let field = match select_field() {
-                Some(field) => field,
-                None => return Ok(()),
+            let field = match select_field(&mut rl) {
+                Ok(field) => field,
+                Err(ToroError::EofError()) => return Ok(()),
+                Err(e) => return Err(e.into()),
             };
 
             use FieldSelection::*;
-            let mut prevs = match field {
+            let mut previous_values = match field {
                 Completed => selected.iter()
                     .map(|t| t.completed().to_string().color(COMPLETED_COLOR).to_string())
                     .collect::<Vec<_>>()
@@ -77,17 +84,49 @@ impl Command for UpdateCommand {
                     .collect::<Vec<_>>()
                     .join(", "),
             };
-            if prevs.len() > 68 {
-                prevs = prevs[..65].to_string();
-                prevs.push_str("...");
+            if previous_values.len() > 68 {
+                previous_values = previous_values[..65].to_string();
+                previous_values.push_str("...");
             }
+
+            let first_previous = match field {
+                Completed => selected.first()
+                    .map(|t| t.completed().to_string())
+                    .unwrap_or(String::new()),
+                Priority => selected.first()
+                    .map(|t| t.priority()
+                        .map(|p| format!("{}", p))
+                        .unwrap_or("none".to_string())
+                        .to_string())
+                    .unwrap_or(String::new()),
+                CompletionDate => selected.first()
+                    .map(|t| t.when_completed()
+                        .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
+                        .unwrap_or("none".to_string())
+                        .to_string())
+                    .unwrap_or(String::new()),
+                CreationDate => selected.first()
+                    .map(|t| t.when_created()
+                        .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
+                        .unwrap_or("none".to_string())
+                        .to_string())
+                    .unwrap_or(String::new()),
+                Description => selected.first()
+                    .map(|t| t.description())
+                    .unwrap_or(String::new()),
+            };
+
+
+            let mut rl = rustyline::DefaultEditor::new().unwrap();
 
             loop {
                 println!();
-                println!("Old value: {}", prevs);
-                let answer = match ask("New value:") {
-                    Some(answer) => answer,
-                    None => return Ok(()),
+                println!("Old value: {}", previous_values);
+                let answer = match rl.readline_with_initial("New value: ", (&first_previous, "")) {   // TODO
+                // let answer = match rl.readline("New value: ") {
+                    Ok(answer) => answer,
+                    Err(rustyline::error::ReadlineError::Eof) => return Ok(()),
+                    Err(e) => return Err(e.into()),
                 };
 
                 match field {
@@ -146,6 +185,8 @@ impl Command for UpdateCommand {
 
                 break;
             }
+
+            println!("\nUpdated {} in {} task(s).\n", field.to_string_fancy(), nrs.len());
 
             file.store()?;
 

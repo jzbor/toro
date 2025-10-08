@@ -1,7 +1,7 @@
 use colored::Colorize;
 
 use crate::commands::Command;
-use crate::error::ToroResult;
+use crate::error::{ToroError, ToroResult};
 use crate::filter::{ColumnSelector, Filter};
 use crate::{interaction::*, Config};
 use crate::home;
@@ -25,6 +25,7 @@ impl Command for DoneCommand {
     fn exec(mut self, config: Config) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
         let columns = config.columns.update_with_cmdline(self.columns);
+        let mut rl = rustyline::DefaultEditor::new()?;
 
         if !self.undo {
             self.filter.include_completed = false;
@@ -36,7 +37,11 @@ impl Command for DoneCommand {
             announce("Select tasks to mark as pending");
         }
 
-        let nrs = select_tasks(&file, columns, Some(&self.filter));
+        let nrs = match select_tasks(&mut rl, &file, columns, Some(&self.filter)) {
+            Ok(nrs) => nrs,
+            Err(ToroError::EofError()) => return Ok(()),
+            Err(e) => return Err(e.into()),
+        };
         let mut filtered = file.filtered_tasks_mut(&self.filter);
 
         let selected = filtered.iter_mut()
