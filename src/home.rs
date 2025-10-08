@@ -42,7 +42,3 @@ pub fn load_or_create_data_file() -> ToroResult<TodoTxtFile> {
     load_data_file()
         .or_else(|_| place_data_file().map(TodoTxtFile::new))
 }
-
-pub fn serde_bool_true() -> bool {
-    true
-}

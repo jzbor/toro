@@ -63,8 +63,8 @@ struct Config {
     pub git: GitConfig,
 }
 
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(serde::Deserialize, Debug, Default)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields, default)]
 struct GitConfig {
     pub auto_commit: bool,
 

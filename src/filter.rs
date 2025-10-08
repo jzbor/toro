@@ -4,13 +4,12 @@ use crate::todotxt::TodoTxtTask;
 
 
 #[derive(clap::Args, serde::Deserialize, Debug, Copy, Clone)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields, default)]
 pub struct ColumnSelector {
     // only ever read/use the non-negated versions
 
     /// Show completion mark column
     #[clap(long = "col-completed")]
-    #[serde(default = "crate::home::serde_bool_true")]
     pub completed: bool,
 
     /// Hide completion mark column
@@ -20,7 +19,6 @@ pub struct ColumnSelector {
 
     /// Show priority column
     #[clap(long = "col-priority")]
-    #[serde(default = "crate::home::serde_bool_true")]
     pub priority: bool,
 
     /// Hide priority column
@@ -30,7 +28,6 @@ pub struct ColumnSelector {
 
     /// Show completion date column
     #[clap(long = "col-completion-date")]
-    #[serde(default = "crate::home::serde_bool_true")]
     pub completion_date: bool,
 
     /// Hide completion date column
@@ -40,7 +37,6 @@ pub struct ColumnSelector {
 
     /// Show creation date column
     #[clap(long = "col-creation-date")]
-    #[serde(default = "crate::home::serde_bool_true")]
     pub creation_date: bool,
 
     /// Hide creation date column
