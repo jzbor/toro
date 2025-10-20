@@ -1,4 +1,4 @@
-#[derive(serde::Deserialize, clap::Args, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, clap::Args, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Config {
     #[clap(flatten)]
@@ -8,7 +8,7 @@ pub struct Config {
     pub git: GitConfig,
 }
 
-#[derive(clap::Args, serde::Deserialize, Debug, Copy, Clone)]
+#[derive(clap::Args, serde::Serialize, serde::Deserialize, Debug, Copy, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields, default)]
 pub struct ColumnSelector {
     // only ever read/use the non-negated versions
@@ -50,7 +50,7 @@ pub struct ColumnSelector {
     no_creation_date: bool,
 }
 
-#[derive(serde::Deserialize, clap::Args, Debug, Default)]
+#[derive(serde::Deserialize, serde::Serialize, clap::Args, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields, default)]
 pub struct GitConfig {
     /// Automatically create git commit after changes
@@ -74,9 +74,10 @@ pub struct GitConfig {
 }
 
 impl Config {
-    pub fn update_with_cmdline(&mut self, other: &Self) {
+    pub fn update_with_cmdline(mut self, other: &Self) -> Self {
         self.columns.update_with_cmdline(&other.columns);
         self.git.update_with_cmdline(&other.git);
+        self
     }
 }
 
@@ -117,12 +118,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             columns: ColumnSelector::default(),
-            git: GitConfig {
-                auto_commit: false,
-                auto_sync: false,
-                no_auto_commit: false,
-                no_auto_sync: false,
-            }
+            git: GitConfig::default(),
         }
     }
 }
@@ -138,6 +134,17 @@ impl Default for ColumnSelector {
             no_completion_date: false,
             creation_date: true,
             no_creation_date: false
+        }
+    }
+}
+
+impl Default for GitConfig {
+    fn default() -> Self {
+        GitConfig {
+            auto_commit: false,
+            no_auto_commit: true,
+            auto_sync: false,
+            no_auto_sync: true,
         }
     }
 }

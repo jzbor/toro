@@ -26,6 +26,9 @@ enum Subcommand {
     /// Open todo.txt file in an editor
     Edit(commands::edit::EditCommand),
 
+    /// Dump configuration
+    Config(commands::config::ConfigCommand),
+
     /// Generate shell completions
     #[clap(hide = true)]
     Completions(commands::completions::CompletionsCommand),
@@ -65,16 +68,17 @@ fn main() {
 
     use Subcommand::*;
     let result = match args.subcommand {
-        Completions(mut cmd) => cmd.configure_exec(&config),
-        Done(mut cmd) => cmd.configure_exec(&config),
-        Edit(mut cmd) => cmd.configure_exec(&config),
-        Git(mut cmd) => cmd.configure_exec(&config),
-        Man(mut cmd) => cmd.configure_exec(&config),
-        New(mut cmd) => cmd.configure_exec(&config),
-        Rewrite(mut cmd) => cmd.configure_exec(&config),
-        Sync(mut cmd) => cmd.configure_exec(&config),
-        Update(mut cmd) => cmd.configure_exec(&config),
-        View(mut cmd) => cmd.configure_exec(&config),
+        Completions(cmd) => cmd.configure_exec(config),
+        Config(cmd) => cmd.configure_exec(config),
+        Done(cmd) => cmd.configure_exec(config),
+        Edit(cmd) => cmd.configure_exec(config),
+        Git(cmd) => cmd.configure_exec(config),
+        Man(cmd) => cmd.configure_exec(config),
+        New(cmd) => cmd.configure_exec(config),
+        Rewrite(cmd) => cmd.configure_exec(config),
+        Sync(cmd) => cmd.configure_exec(config),
+        Update(cmd) => cmd.configure_exec(config),
+        View(cmd) => cmd.configure_exec(config),
     };
 
     error::resolve(result)

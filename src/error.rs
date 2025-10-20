@@ -34,6 +34,9 @@ pub enum ToroError {
     #[error("Invalid config file\n{0}")]
     ConfigSyntaxError(#[from] toml::de::Error),
 
+    #[error("Unable to serialize config\n{0}")]
+    ConfigSerializationError(#[from] toml::ser::Error),
+
     #[error("{0}")]
     ManError(String),
 
