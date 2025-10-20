@@ -1,7 +1,7 @@
 use crate::commands::Command;
 use crate::error::ToroResult;
 use crate::filter::Filter;
-use crate::{home, Config};
+use crate::{exec, home, Config};
 
 #[derive(clap::Args, Debug)]
 pub struct ViewCommand {
@@ -23,6 +23,11 @@ pub struct ViewCommand {
 impl Command for ViewCommand {
     fn exec(&self) -> ToroResult<()> {
         let file = home::load_or_create_data_file()?;
+
+        if let Some(cmd) = &self.config.view.cal_command {
+            exec::exec("sh", ["-c", cmd])?
+        }
+
         file.list(self.numbered, !self.top_to_bottom, self.config.columns, Some(&self.filter));
         Ok(())
     }

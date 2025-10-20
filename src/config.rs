@@ -2,10 +2,16 @@
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Config {
     #[clap(flatten)]
+    #[serde(default)]
     pub columns: ColumnSelector,
 
     #[clap(flatten)]
+    #[serde(default)]
     pub git: GitConfig,
+
+    #[clap(flatten)]
+    #[serde(default)]
+    pub view: ViewConfig,
 }
 
 #[derive(clap::Args, serde::Serialize, serde::Deserialize, Debug, Copy, Clone)]
@@ -70,19 +76,32 @@ pub struct GitConfig {
     #[clap(long, overrides_with = "auto_sync")]
     #[serde(skip)]
     no_auto_sync: bool,
-
 }
 
-impl Config {
-    pub fn update_with_cmdline(mut self, other: &Self) -> Self {
+#[derive(serde::Deserialize, serde::Serialize, clap::Args, Debug, Default)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields, default)]
+pub struct ViewConfig {
+    /// Automatically create git commit after changes
+    #[clap(long)]
+    pub cal_command: Option<String>,
+}
+
+
+pub trait UpdatableConfig {
+    fn update_with_cmdline(&mut self, other: &Self);
+}
+
+
+impl UpdatableConfig for Config {
+    fn update_with_cmdline(&mut self, other: &Self) {
         self.columns.update_with_cmdline(&other.columns);
         self.git.update_with_cmdline(&other.git);
-        self
+        self.view.update_with_cmdline(&other.view);
     }
 }
 
-impl ColumnSelector {
-    pub fn update_with_cmdline(&mut self, other: &Self) {
+impl UpdatableConfig for ColumnSelector {
+    fn update_with_cmdline(&mut self, other: &Self) {
         if other.completed || other.no_completed {
             self.completed = other.completed
         }
@@ -113,12 +132,21 @@ impl GitConfig {
     }
 }
 
+impl ViewConfig {
+    pub fn update_with_cmdline(&mut self, other: &Self) {
+        if let Some(other_cmd) = &other.cal_command {
+            self.cal_command = Some(other_cmd.to_owned());
+        }
+    }
+}
+
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             columns: ColumnSelector::default(),
             git: GitConfig::default(),
+            view: ViewConfig::default(),
         }
     }
 }

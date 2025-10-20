@@ -4,7 +4,7 @@ use chrono::{Datelike, NaiveDate};
 use crate::commands::Command;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
-use crate::interaction::*;
+use crate::{exec, interaction::*};
 use crate::todotxt::parse_date;
 use crate::{home, Config};
 
@@ -23,6 +23,10 @@ impl Command for UpdateCommand {
         let mut rl = rustyline::DefaultEditor::new()?;
 
         loop {
+            if let Some(cmd) = &self.config.view.cal_command {
+                exec::exec("sh", ["-c", cmd])?
+            }
+
             announce("Select tasks to update");
             let nrs = match select_tasks(&mut rl, &file, self.config.columns, Some(&self.filter)) {
                 Ok(nrs) => nrs,

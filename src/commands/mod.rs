@@ -1,3 +1,4 @@
+use crate::config::UpdatableConfig;
 use crate::error::ToroResult;
 use crate::Config;
 
@@ -18,8 +19,9 @@ pub trait Command: clap::Args {
 
     fn config_mut(&mut self) -> &mut Config;
 
-    fn configure_exec(mut self, config: Config) -> ToroResult<()> {
-        *self.config_mut() = config.update_with_cmdline(self.config_mut());
+    fn configure_exec(mut self, mut config: Config) -> ToroResult<()> {
+        config.update_with_cmdline(self.config_mut());
+        *self.config_mut() = config;
         self.exec()
     }
 }
