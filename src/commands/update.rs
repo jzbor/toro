@@ -3,7 +3,7 @@ use chrono::{Datelike, NaiveDate};
 
 use crate::commands::Command;
 use crate::error::{ToroError, ToroResult};
-use crate::filter::{ColumnSelector, Filter};
+use crate::filter::Filter;
 use crate::interaction::*;
 use crate::todotxt::parse_date;
 use crate::{home, Config};
@@ -14,21 +14,20 @@ pub struct UpdateCommand {
     filter: Filter,
 
     #[clap(flatten)]
-    columns: ColumnSelector,
+    config: Config,
 }
 
 impl Command for UpdateCommand {
-    fn exec(self, config: Config) -> ToroResult<()> {
+    fn exec(&self) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
-        let columns = config.columns.update_with_cmdline(self.columns);
         let mut rl = rustyline::DefaultEditor::new()?;
 
         loop {
             announce("Select tasks to update");
-            let nrs = match select_tasks(&mut rl, &file, columns, Some(&self.filter)) {
+            let nrs = match select_tasks(&mut rl, &file, self.config.columns, Some(&self.filter)) {
                 Ok(nrs) => nrs,
                 Err(ToroError::EofError()) => return Ok(()),
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(e),
             };
 
             let filtered = file.filtered_tasks_mut(&self.filter);
@@ -37,7 +36,7 @@ impl Command for UpdateCommand {
                 .filter_map(|(i, t)| if nrs.contains(&i) { Some(t) } else { None })
                 .collect();
 
-            if selected.len() == 0 {
+            if selected.is_empty() {
                 continue;
             }
 
@@ -46,7 +45,7 @@ impl Command for UpdateCommand {
             let field = match select_field(&mut rl) {
                 Ok(field) => field,
                 Err(ToroError::EofError()) => return Ok(()),
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(e),
             };
 
             use FieldSelection::*;
@@ -190,13 +189,17 @@ impl Command for UpdateCommand {
 
             file.store()?;
 
-            if config.git.auto_commit {
+            if self.config.git.auto_commit {
                 file.commit(&format!("Updated {} in {} task(s)", field, nrs.len()))?;
             }
-            if config.git.auto_sync {
+            if self.config.git.auto_sync {
                 file.sync()?;
             }
         }
 
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }

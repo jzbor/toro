@@ -6,11 +6,18 @@ use crate::{home, Config};
 pub struct GitCommand {
     #[clap(allow_hyphen_values = true)]
     args: Vec<String>,
+
+    #[clap(flatten)]
+    config: Config,
 }
 
 impl Command for GitCommand {
-    fn exec(self, _: Config) -> ToroResult<()> {
+    fn exec(&self) -> ToroResult<()> {
         let file = home::load_or_create_data_file()?;
-        file.git(self.args)
+        file.git(self.args.iter())
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }

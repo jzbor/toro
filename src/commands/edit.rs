@@ -7,10 +7,12 @@ use crate::{home, Config};
 
 #[derive(clap::Args)]
 pub struct EditCommand {
+    #[clap(flatten)]
+    config: Config,
 }
 
 impl Command for EditCommand {
-    fn exec(self, _: Config) -> ToroResult<()> {
+    fn exec(&self) -> ToroResult<()> {
         let file = home::load_or_create_data_file()?;
         let path = file.location();
         let editor = env::var("EDITOR")
@@ -19,6 +21,10 @@ impl Command for EditCommand {
         exec(&editor, [path])?;
 
         Ok(())
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }
 

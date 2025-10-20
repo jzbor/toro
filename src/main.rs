@@ -1,15 +1,17 @@
 use clap::Parser;
 
 use crate::commands::Command;
-use crate::filter::ColumnSelector;
+use crate::config::*;
 
-mod home;
 mod commands;
+mod config;
 mod error;
-mod todotxt;
 mod exec;
 mod filter;
+mod home;
 mod interaction;
+mod todotxt;
+
 
 /// CLI Client to manage a todo.txt list
 #[derive(Parser)]
@@ -55,36 +57,6 @@ enum Subcommand {
     View(commands::view::ViewCommand),
 }
 
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-struct Config {
-    pub columns: ColumnSelector,
-
-    pub git: GitConfig,
-}
-
-#[derive(serde::Deserialize, Debug, Default)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields, default)]
-struct GitConfig {
-    pub auto_commit: bool,
-
-    pub auto_sync: bool,
-}
-
-
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            columns: ColumnSelector::default(),
-            git: GitConfig {
-                auto_commit: false,
-                auto_sync: false,
-            }
-        }
-    }
-}
-
 
 fn main() {
     let args = Args::parse();
@@ -93,16 +65,16 @@ fn main() {
 
     use Subcommand::*;
     let result = match args.subcommand {
-        Completions(cmd) => cmd.exec(config),
-        Done(cmd) => cmd.exec(config),
-        Edit(cmd) => cmd.exec(config),
-        Git(cmd) => cmd.exec(config),
-        Man(cmd) => cmd.exec(config),
-        New(cmd) => cmd.exec(config),
-        Rewrite(cmd) => cmd.exec(config),
-        Sync(cmd) => cmd.exec(config),
-        Update(cmd) => cmd.exec(config),
-        View(cmd) => cmd.exec(config),
+        Completions(mut cmd) => cmd.configure_exec(&config),
+        Done(mut cmd) => cmd.configure_exec(&config),
+        Edit(mut cmd) => cmd.configure_exec(&config),
+        Git(mut cmd) => cmd.configure_exec(&config),
+        Man(mut cmd) => cmd.configure_exec(&config),
+        New(mut cmd) => cmd.configure_exec(&config),
+        Rewrite(mut cmd) => cmd.configure_exec(&config),
+        Sync(mut cmd) => cmd.configure_exec(&config),
+        Update(mut cmd) => cmd.configure_exec(&config),
+        View(mut cmd) => cmd.configure_exec(&config),
     };
 
     error::resolve(result)

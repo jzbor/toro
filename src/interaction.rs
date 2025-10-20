@@ -2,8 +2,9 @@ use std::fmt::Display;
 
 use colored::{Color, Colorize};
 
+use crate::config::ColumnSelector;
 use crate::error::{ToroError, ToroResult};
-use crate::filter::{ColumnSelector, Filter};
+use crate::filter::Filter;
 use crate::todotxt::TodoTxtFile;
 
 pub const COMPLETED_COLOR: Color = Color::BrightCyan;

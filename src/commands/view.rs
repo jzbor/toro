@@ -1,6 +1,6 @@
 use crate::commands::Command;
 use crate::error::ToroResult;
-use crate::filter::{ColumnSelector, Filter};
+use crate::filter::Filter;
 use crate::{home, Config};
 
 #[derive(clap::Args, Debug)]
@@ -17,15 +17,17 @@ pub struct ViewCommand {
     filter: Filter,
 
     #[clap(flatten)]
-    columns: ColumnSelector,
+    config: Config,
 }
 
 impl Command for ViewCommand {
-    fn exec(self, config: Config) -> ToroResult<()> {
-        let columns = config.columns.update_with_cmdline(self.columns);
-
+    fn exec(&self) -> ToroResult<()> {
         let file = home::load_or_create_data_file()?;
-        file.list(self.numbered, !self.top_to_bottom, columns, Some(&self.filter));
+        file.list(self.numbered, !self.top_to_bottom, self.config.columns, Some(&self.filter));
         Ok(())
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }

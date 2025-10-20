@@ -15,8 +15,9 @@ use pest::Parser;
 use pest_derive::Parser;
 
 
+use crate::config::ColumnSelector;
 use crate::error::{ToroError, ToroResult};
-use crate::filter::{ColumnSelector, Filter};
+use crate::filter::Filter;
 use crate::exec::*;
 use crate::interaction::*;
 

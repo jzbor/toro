@@ -9,10 +9,13 @@ use crate::Config;
 #[derive(clap::Args)]
 pub struct ManCommand {
     directory: path::PathBuf,
+
+    #[clap(flatten)]
+    config: Config,
 }
 
 impl super::Command for ManCommand {
-    fn exec(self, _: Config) -> ToroResult<()> {
+    fn exec(&self) -> ToroResult<()> {
         // export main
         let man = clap_mangen::Man::new(crate::Args::command());
         let mut buffer: Vec<u8> = Default::default();
@@ -35,5 +38,9 @@ impl super::Command for ManCommand {
         }
 
         Ok(())
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }

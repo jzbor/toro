@@ -12,10 +12,13 @@ use crate::Config;
 #[derive(clap::Args)]
 pub struct CompletionsCommand {
     directory: path::PathBuf,
+
+    #[clap(flatten)]
+    config: Config,
 }
 
 impl super::Command for CompletionsCommand {
-    fn exec(self, _: Config) -> ToroResult<()> {
+    fn exec(&self) -> ToroResult<()> {
         let mut command = crate::Args::command();
         let shells = &[
             (Shell::Bash, "bash"),
@@ -32,5 +35,9 @@ impl super::Command for CompletionsCommand {
         }
 
         Ok(())
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }

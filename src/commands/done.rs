@@ -2,7 +2,7 @@ use colored::Colorize;
 
 use crate::commands::Command;
 use crate::error::{ToroError, ToroResult};
-use crate::filter::{ColumnSelector, Filter};
+use crate::filter::Filter;
 use crate::{interaction::*, Config};
 use crate::home;
 
@@ -18,29 +18,29 @@ pub struct DoneCommand {
     filter: Filter,
 
     #[clap(flatten)]
-    columns: ColumnSelector,
+    config: Config,
 }
 
 impl Command for DoneCommand {
-    fn exec(mut self, config: Config) -> ToroResult<()> {
+    fn exec(&self) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
-        let columns = config.columns.update_with_cmdline(self.columns);
         let mut rl = rustyline::DefaultEditor::new()?;
+        let mut filter = self.filter.clone();
 
         if !self.undo {
-            self.filter.include_completed = false;
-            self.filter.include_pending = true;
+            filter.include_completed = false;
+            filter.include_pending = true;
             announce("Select tasks to mark as completed");
         } else {
-            self.filter.include_completed = true;
-            self.filter.include_pending = false;
+            filter.include_completed = true;
+            filter.include_pending = false;
             announce("Select tasks to mark as pending");
         }
 
-        let nrs = match select_tasks(&mut rl, &file, columns, Some(&self.filter)) {
+        let nrs = match select_tasks(&mut rl, &file, self.config.columns, Some(&filter)) {
             Ok(nrs) => nrs,
             Err(ToroError::EofError()) => return Ok(()),
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(e),
         };
         let mut filtered = file.filtered_tasks_mut(&self.filter);
 
@@ -60,15 +60,19 @@ impl Command for DoneCommand {
 
         file.store()?;
 
-        if config.git.auto_commit {
+        if self.config.git.auto_commit {
             let state = if self.undo { "pending" } else { "completed" };
             file.commit(&format!("Marked {} tasks as \"{}\"", nrs.len(), state))?;
         }
-        if config.git.auto_sync {
+        if self.config.git.auto_sync {
             file.sync()?;
         }
 
         Ok(())
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }
 

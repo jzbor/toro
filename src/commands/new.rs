@@ -9,11 +9,14 @@ use crate::interaction::*;
 #[derive(clap::Args, Debug)]
 pub struct NewCommand {
     /// New task in todo.txt format
-    text: String
+    text: String,
+
+    #[clap(flatten)]
+    config: Config,
 }
 
 impl Command for NewCommand {
-    fn exec(self, config: Config) -> ToroResult<()> {
+    fn exec(&self) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
         let task = TodoTxtTask::parse(&self.text)?;
         let description = task.description().color(SELECTION_COLOR);
@@ -24,14 +27,17 @@ impl Command for NewCommand {
         file.push(task);
         file.store()?;
 
-        if config.git.auto_commit {
+        if self.config.git.auto_commit {
             file.commit(&format!("Created new task \"{}\"", description))?;
         }
-        if config.git.auto_sync {
+        if self.config.git.auto_sync {
             file.sync()?;
         }
 
-
         Ok(())
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }

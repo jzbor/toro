@@ -4,21 +4,27 @@ use crate::{home, Config};
 
 #[derive(clap::Args)]
 pub struct RewriteCommand {
+    #[clap(flatten)]
+    config: Config,
 }
 
 impl Command for RewriteCommand {
-    fn exec(self, config: Config) -> ToroResult<()> {
+    fn exec(&self) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
         file.store()?;
 
-        if config.git.auto_commit {
+        if self.config.git.auto_commit {
             file.commit("Rewrite todo.txt file")?;
         }
-        if config.git.auto_sync {
+        if self.config.git.auto_sync {
             file.sync()?;
         }
 
         Ok(())
+    }
+
+    fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
     }
 }
 
