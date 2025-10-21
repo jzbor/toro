@@ -47,6 +47,9 @@ enum Subcommand {
     #[clap(alias("add"))]
     New(commands::new::NewCommand),
 
+    /// Change the priority of a task
+    Prioritize(commands::prioritize::PrioritizeCommand),
+
     /// Load and write back todo.txt file
     Rewrite(commands::rewrite::RewriteCommand),
 
@@ -75,6 +78,7 @@ fn main() {
         Git(cmd) => cmd.configure_exec(config),
         Man(cmd) => cmd.configure_exec(config),
         New(cmd) => cmd.configure_exec(config),
+        Prioritize(cmd) => cmd.configure_exec(config),
         Rewrite(cmd) => cmd.configure_exec(config),
         Sync(cmd) => cmd.configure_exec(config),
         Update(cmd) => cmd.configure_exec(config),

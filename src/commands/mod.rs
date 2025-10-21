@@ -9,6 +9,7 @@ pub mod edit;
 pub mod git;
 pub mod man;
 pub mod new;
+pub mod prioritize;
 pub mod rewrite;
 pub mod sync;
 pub mod update;
