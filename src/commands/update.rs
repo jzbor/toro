@@ -28,7 +28,8 @@ impl Command for UpdateCommand {
             }
 
             announce("Select tasks to update");
-            let nrs = match select_tasks(&mut rl, &file, self.config.columns, Some(&self.filter)) {
+            let res = select_tasks(&mut rl, &file, self.config.columns, Some(&self.filter), self.config.view.auto_select);
+            let (auto_selected, nrs) = match res {
                 Ok(nrs) => nrs,
                 Err(ToroError::EofError()) => return Ok(()),
                 Err(e) => return Err(e),
@@ -199,8 +200,11 @@ impl Command for UpdateCommand {
             if self.config.git.auto_sync {
                 file.sync()?;
             }
-        }
 
+            if auto_selected {
+                return Ok(())
+            }
+        }
     }
 
     fn config_mut(&mut self) -> &mut Config {

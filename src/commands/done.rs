@@ -37,7 +37,8 @@ impl Command for DoneCommand {
             announce("Select tasks to mark as pending");
         }
 
-        let nrs = match select_tasks(&mut rl, &file, self.config.columns, Some(&filter)) {
+        let res = select_tasks(&mut rl, &file, self.config.columns, Some(&self.filter), self.config.view.auto_select);
+        let (_, nrs) = match res {
             Ok(nrs) => nrs,
             Err(ToroError::EofError()) => return Ok(()),
             Err(e) => return Err(e),
@@ -47,6 +48,8 @@ impl Command for DoneCommand {
         let selected = filtered.iter_mut()
             .enumerate()
             .filter_map(|(i, t)| if nrs.contains(&i) { Some(t) } else { None });
+
+        println!();
 
         for task in selected {
             if !self.undo {

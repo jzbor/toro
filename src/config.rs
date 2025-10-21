@@ -1,5 +1,6 @@
 #[derive(serde::Serialize, serde::Deserialize, clap::Args, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Default)]
 pub struct Config {
     #[clap(flatten)]
     #[serde(default)]
@@ -84,6 +85,15 @@ pub struct ViewConfig {
     /// Automatically create git commit after changes
     #[clap(long)]
     pub cal_command: Option<String>,
+
+    /// Automatically select task if only one matches filter
+    #[clap(long)]
+    pub auto_select: bool,
+
+    /// Do not automatically select task if only one matches filter
+    #[clap(long, overrides_with = "auto_select")]
+    #[serde(skip)]
+    no_auto_select: bool,
 }
 
 
@@ -137,19 +147,14 @@ impl ViewConfig {
         if let Some(other_cmd) = &other.cal_command {
             self.cal_command = Some(other_cmd.to_owned());
         }
-    }
-}
 
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            columns: ColumnSelector::default(),
-            git: GitConfig::default(),
-            view: ViewConfig::default(),
+        if other.auto_select || other.no_auto_select {
+            self.auto_select = other.auto_select
         }
     }
 }
+
+
 
 impl Default for ColumnSelector {
     fn default() -> Self {

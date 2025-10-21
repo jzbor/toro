@@ -67,8 +67,14 @@ pub fn announce(s: &str) {
 }
 
 pub fn select_tasks(rl: &mut rustyline::DefaultEditor, file: &TodoTxtFile,
-        columns: ColumnSelector, filter_opt: Option<&Filter>) -> ToroResult<Vec<usize>> {
+        columns: ColumnSelector, filter_opt: Option<&Filter>, auto_select: bool) -> ToroResult<(bool, Vec<usize>)> {
     let ntasks = file.list(true, true, columns, filter_opt);
+
+    if auto_select && ntasks == 1 {
+        println!("\n  [Auto selecting task]");
+        return Ok((true, vec!(0)))
+    }
+
     println!();
 
     loop {
@@ -88,7 +94,7 @@ pub fn select_tasks(rl: &mut rustyline::DefaultEditor, file: &TodoTxtFile,
         };
 
         match nrs.iter().find(|n| **n >= ntasks) {
-            None => return Ok(nrs),
+            None => return Ok((false, nrs)),
             Some(nr) => { eprintln!("{}", format!("Out of range: {}", nr + 1).red()); continue },
         }
     }
