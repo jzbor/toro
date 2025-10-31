@@ -37,7 +37,7 @@ impl Command for DoneCommand {
             announce("Select tasks to mark as pending");
         }
 
-        let res = select_tasks(&mut rl, &file, self.config.columns, Some(&self.filter), self.config.view.auto_select);
+        let res = select_tasks(&mut rl, &file, self.config.columns, &self.config.view, Some(&self.filter), self.config.view.auto_select);
         let (_, nrs) = match res {
             Ok(nrs) => nrs,
             Err(ToroError::EofError()) => return Ok(()),
@@ -53,10 +53,14 @@ impl Command for DoneCommand {
 
         for task in selected {
             if !self.undo {
-                println!("Marking \"{}\" as {}.", task.description_fancy().color(SELECTION_COLOR), "completed".color(COMPLETED_COLOR));
+                println!("Marking \"{}\" as {}.",
+                    task.description_fancy(&self.config.view).color(SELECTION_COLOR),
+                    "completed".color(COMPLETED_COLOR));
                 task.complete();
             } else {
-                println!("Marking \"{}\" as {}.", task.description_fancy().color(SELECTION_COLOR), "pending".color(PENDING_COLOR));
+                println!("Marking \"{}\" as {}.",
+                    task.description_fancy(&self.config.view).color(SELECTION_COLOR),
+                    "pending".color(PENDING_COLOR));
                 task.uncomplete();
             }
         }

@@ -32,7 +32,7 @@ impl Command for PrioritizeCommand {
         }
 
         announce("Select tasks to prioritize");
-        let res = select_tasks(&mut rl, &file, self.config.columns, Some(&self.filter), self.config.view.auto_select);
+        let res = select_tasks(&mut rl, &file, self.config.columns, &self.config.view, Some(&self.filter), self.config.view.auto_select);
         let (_, nrs) = match res {
             Ok(nrs) => nrs,
             Err(ToroError::EofError()) => return Ok(()),

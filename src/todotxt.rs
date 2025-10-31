@@ -8,14 +8,15 @@ use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{NaiveDate, Utc};
 use colored::Colorize;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 use pest_derive::Parser;
 
 
-use crate::config::ColumnSelector;
+use crate::config::{ColumnSelector, ViewConfig};
+use crate::date::*;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
 use crate::exec::*;
@@ -147,7 +148,7 @@ impl TodoTxtFile {
             .collect()
     }
 
-    pub fn list(&self, numbered: bool, reverse: bool, columns: ColumnSelector, filter_opt: Option<&Filter>) -> usize {
+    pub fn list(&self, numbered: bool, reverse: bool, columns: ColumnSelector, view: &ViewConfig, filter_opt: Option<&Filter>) -> usize {
         let tasks = if let Some(filter) = filter_opt {
             self.filtered_tasks(filter)
         } else {
@@ -165,11 +166,11 @@ impl TodoTxtFile {
             let max_width = ntasks.to_string().len();
             for (i, task) in enumerated {
                 println!("{} {}", format!("[{: >width$}]", i + 1, width = max_width).color(SELECTION_COLOR),
-                    task.to_string_fancy(columns));
+                    task.to_string_fancy(columns, view));
             }
         } else {
             for (_, task) in enumerated {
-                println!("{}", task.to_string_fancy(columns));
+                println!("{}", task.to_string_fancy(columns, view));
             }
         }
 
@@ -258,7 +259,7 @@ impl TodoTxtTask {
         description
     }
 
-    pub fn to_string_fancy(&self, columns: ColumnSelector) -> String {
+    pub fn to_string_fancy(&self, columns: ColumnSelector, view: &ViewConfig) -> String {
         let mut s = String::new();
 
         if columns.completed {
@@ -279,7 +280,7 @@ impl TodoTxtTask {
 
         if columns.completion_date {
             let date_str = if let Some(date) = self.when_completed() {
-                format!("{:0>4}-{:0>2}-{:0>2}", date.year(), date.month(), date.day())
+                format_date(date, view.pretty_dates)
             } else {
                 String::new()
             };
@@ -289,7 +290,7 @@ impl TodoTxtTask {
 
         if columns.creation_date {
             let date_str = if let Some(date) = self.when_created() {
-                format!("{:0>4}-{:0>2}-{:0>2}", date.year(), date.month(), date.day())
+                format_date(date, view.pretty_dates)
             } else {
                 String::new()
             };
@@ -297,7 +298,7 @@ impl TodoTxtTask {
             s.push_str(&format!("{:<10} ", date_str));
         }
 
-        s.push_str(&self.description_fancy());
+        s.push_str(&self.description_fancy(view));
 
         if self.completed() {
             s = s.strikethrough().to_string();
@@ -374,11 +375,15 @@ impl TodoTxtTask {
             .join("")
     }
 
-    pub fn description_fancy(&self) -> String {
+    pub fn description_fancy(&self, view: &ViewConfig) -> String {
         let mut s = String::new();
 
         for token in &self.description {
-            s.push_str(&token.to_string_colored());
+            if let DescriptionToken::Meta(k, v) = token && k == "due" && let Ok(date) = parse_date(v) {
+                s.push_str(&token.colored(&format!("{}:{}", k, format_date(date, view.pretty_dates))));
+            } else {
+                s.push_str(&token.to_string_colored());
+            }
         }
 
         s
@@ -451,15 +456,18 @@ impl DateRecord {
 }
 
 impl DescriptionToken {
-    fn to_string_colored(&self) -> String {
-        let plain_string = self.to_string();
+    fn colored(&self, s: &str) -> String {
         use DescriptionToken::*;
         match self {
-            Project(_) => plain_string.bold().to_string(),
-            Context(_) => plain_string.italic().to_string(),
-            Meta(..) => plain_string.dimmed().to_string(),
-            Other(_) => plain_string,
+            Project(_) => s.bold().to_string(),
+            Context(_) => s.italic().to_string(),
+            Meta(..) => s.dimmed().to_string(),
+            Other(_) => s.to_owned(),
         }
+    }
+
+    fn to_string_colored(&self) -> String {
+        self.colored(&self.to_string())
     }
 }
 
@@ -494,10 +502,8 @@ impl Display for DateRecord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use DateRecord::*;
         match self {
-            Created(created) => write!(f, "{:0>4}-{:0>2}-{:0>2} ", created.year(), created.month(), created.day()),
-            CompletedCreated(completed, created) => write!(f, "{:0>4}-{:0>2}-{:0>2} {:0>4}-{:0>2}-{:0>2} ",
-                completed.year(), completed.month(), completed.day(),
-                created.year(), created.month(), created.day()),
+            Created(created) => write!(f, "{} ", format_date(*created, false)),
+            CompletedCreated(completed, created) => write!(f, "{} {} ", format_date(*completed, false), format_date(*created, false)),
             NoDate => Ok(()),
         }
     }
@@ -530,24 +536,4 @@ impl Hash for TodoTxtTask {
         self.dates.hash(state);
         self.description.hash(state);
     }
-}
-
-pub fn parse_date(input: &str) -> ToroResult<NaiveDate> {
-    let mut parts = input.splitn(3, "-");
-
-    let year_str = parts.next().ok_or_else(|| ToroError::DateInputError(input.to_owned()))?;
-    let month_str = parts.next().ok_or_else(|| ToroError::DateInputError(input.to_owned()))?;
-    let day_str = parts.next().ok_or_else(|| ToroError::DateInputError(input.to_owned()))?;
-
-    let year = str::parse(year_str).map_err(|_| ToroError::DateInputError(input.to_owned()))?;
-    let month = str::parse(month_str).map_err(|_| ToroError::DateInputError(input.to_owned()))?;
-    let day = str::parse(day_str).map_err(|_| ToroError::DateInputError(input.to_owned()))?;
-
-    NaiveDate::default()
-        .with_year(year)
-        .ok_or_else(|| ToroError::DateInputError(input.to_owned()))?
-        .with_month(month)
-        .ok_or_else(|| ToroError::DateInputError(input.to_owned()))?
-        .with_day(day)
-        .ok_or_else(|| ToroError::DateInputError(input.to_owned()))
 }

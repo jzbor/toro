@@ -5,6 +5,7 @@ use crate::config::*;
 
 mod commands;
 mod config;
+mod date;
 mod error;
 mod exec;
 mod filter;

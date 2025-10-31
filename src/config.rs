@@ -94,6 +94,15 @@ pub struct ViewConfig {
     #[clap(long, overrides_with = "auto_select")]
     #[serde(skip)]
     no_auto_select: bool,
+
+    /// Pretty print dates
+    #[clap(long)]
+    pub pretty_dates: bool,
+
+    /// Do not pretty print dates
+    #[clap(long, overrides_with = "pretty_dates")]
+    #[serde(skip)]
+    no_pretty_dates: bool,
 }
 
 

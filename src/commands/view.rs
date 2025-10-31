@@ -28,7 +28,7 @@ impl Command for ViewCommand {
             exec::exec("sh", ["-c", cmd])?
         }
 
-        file.list(self.numbered, !self.top_to_bottom, self.config.columns, Some(&self.filter));
+        file.list(self.numbered, !self.top_to_bottom, self.config.columns, &self.config.view, Some(&self.filter));
         Ok(())
     }
 

@@ -20,7 +20,7 @@ impl Command for NewCommand {
         let mut file = home::load_or_create_data_file()?;
         let task = TodoTxtTask::parse(&self.text)?;
         let description = task.description();
-        let description_fancy = task.description_fancy().color(SELECTION_COLOR);
+        let description_fancy = task.description_fancy(&self.config.view).color(SELECTION_COLOR);
 
         println!("Creating new task \"{}\".", description_fancy);
 

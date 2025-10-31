@@ -25,6 +25,9 @@ pub enum ToroError {
     #[error("Data file not found")]
     DataFileNotFound(),
 
+    #[error("Date overflow")]
+    DateOverflowError(),
+
     #[error("External command '{0}' failed")]
     ExternalCommandFailed(String),
 

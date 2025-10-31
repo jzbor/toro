@@ -5,7 +5,7 @@ use crate::commands::Command;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
 use crate::{exec, interaction::*};
-use crate::todotxt::parse_date;
+use crate::date::parse_date;
 use crate::{home, Config};
 
 #[derive(clap::Args, Debug)]
@@ -28,7 +28,7 @@ impl Command for UpdateCommand {
             }
 
             announce("Select tasks to update");
-            let res = select_tasks(&mut rl, &file, self.config.columns, Some(&self.filter), self.config.view.auto_select);
+            let res = select_tasks(&mut rl, &file, self.config.columns, &self.config.view, Some(&self.filter), self.config.view.auto_select);
             let (auto_selected, nrs) = match res {
                 Ok(nrs) => nrs,
                 Err(ToroError::EofError()) => return Ok(()),
