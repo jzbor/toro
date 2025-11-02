@@ -15,7 +15,7 @@ use pest::Parser;
 use pest_derive::Parser;
 
 
-use crate::config::{ColumnSelector, ViewConfig};
+use crate::config::{ColumnSelector, SortBy, ViewConfig};
 use crate::date::*;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
@@ -71,17 +71,15 @@ impl TodoTxtFile {
             .map(TodoTxtTask::parse)
             .collect::<ToroResult<Vec<_>>>()?;
 
-        let mut file = TodoTxtFile {
+        let file = TodoTxtFile {
             location: path,
             tasks,
         };
 
-        file.resort();
         Ok(file)
     }
 
     pub fn store(&mut self) -> ToroResult<()> {
-        self.resort();
         let mut file = fs::File::create(&self.location)?;
         let content = self.iter()
             .map(|t| t.to_string())
@@ -126,34 +124,62 @@ impl TodoTxtFile {
         Ok(())
     }
 
-    pub fn resort(&mut self) {
-        self.tasks.sort_by_key(|t| Reverse(t.when_created().unwrap_or_default()));
-        self.tasks.sort_by_key(|t| t.priority().unwrap_or('['));
-        self.tasks.sort_by_key(|t| t.completed());
+    pub fn filtered_sorted(&self, filter_opt: Option<&Filter>, sort_by: &[SortBy]) -> impl Iterator<Item = &TodoTxtTask> {
+        let mut entries: Vec<_> = if let Some(filter) = filter_opt {
+            self.tasks.iter()
+                .filter(|t| filter.approves(t))
+                .collect()
+        } else {
+            self.tasks.iter()
+                .collect()
+        };
+
+        for key in sort_by {
+            use SortBy::*;
+            match key {
+                Description => entries.sort_by_key(|e| e.description()),
+                Created => entries.sort_by_key(|e| Reverse(e.when_created().unwrap_or_default())),
+                Completed => entries.sort_by_key(|e| e.completed()),
+                Priority => entries.sort_by_key(|e| e.priority().unwrap_or('[')),
+                Nop => (),
+                Due => entries.sort_by_key(|e| Reverse(e.when_due().unwrap_or_default())),
+            }
+        }
+
+        entries.into_iter()
+    }
+
+    pub fn filtered_sorted_mut(&mut self, filter_opt: Option<&Filter>, sort_by: &[SortBy]) -> impl Iterator<Item = &mut TodoTxtTask> {
+        let mut entries: Vec<_> = if let Some(filter) = filter_opt {
+            self.tasks.iter_mut()
+                .filter(|t| filter.approves(t))
+                .collect()
+        } else {
+            self.tasks.iter_mut()
+                .collect()
+        };
+
+        for key in sort_by {
+            use SortBy::*;
+            match key {
+                Completed => entries.sort_by_key(|e| e.completed()),
+                Created => entries.sort_by_key(|e| Reverse(e.when_created().unwrap_or_default())),
+                Description => entries.sort_by_key(|e| e.description()),
+                Due => entries.sort_by_key(|e| e.when_due().unwrap_or_default().unwrap_or_default()),
+                Nop => (),
+                Priority => entries.sort_by_key(|e| e.priority().unwrap_or('[')),
+            }
+        }
+
+        entries.into_iter()
     }
 
     pub fn location(&self) -> &PathBuf {
         &self.location
     }
 
-    pub fn filtered_tasks(&self, filter: &Filter) -> Vec<&TodoTxtTask> {
-        self.tasks.iter()
-            .filter(|t| filter.approves(t))
-            .collect()
-    }
-
-    pub fn filtered_tasks_mut(&mut self, filter: &Filter) -> Vec<&mut TodoTxtTask> {
-        self.tasks.iter_mut()
-            .filter(|t| filter.approves(t))
-            .collect()
-    }
-
     pub fn list(&self, numbered: bool, reverse: bool, columns: ColumnSelector, view: &ViewConfig, filter_opt: Option<&Filter>) -> usize {
-        let tasks = if let Some(filter) = filter_opt {
-            self.filtered_tasks(filter)
-        } else {
-            self.tasks.iter().collect()
-        };
+        let tasks: Vec<_> = self.filtered_sorted(filter_opt, &view.sort).collect();
 
         let ntasks = tasks.len();
         let enumerated = if reverse {
@@ -323,6 +349,13 @@ impl TodoTxtTask {
         self.dates.created()
     }
 
+    pub fn when_due(&self) -> ToroResult<Option<NaiveDate>> {
+        match self.meta("due") {
+            Some(s) => Ok(Some(parse_date(s)?)),
+            None => Ok(None),
+        }
+    }
+
     pub fn complete(&mut self) {
         self.completed = true;
         self.dates.set_completed(Utc::now().naive_local().into())
@@ -396,6 +429,16 @@ impl TodoTxtTask {
             .into_inner().next().unwrap();
         self.description = Self::parse_description(parsed);
         Ok(())
+    }
+
+    pub fn meta(&self, key: &str) -> Option<&str> {
+        for token in &self.description {
+            if let DescriptionToken::Meta(k, v) = token && k == key {
+                return Some(v)
+            }
+        }
+
+        None
     }
 }
 

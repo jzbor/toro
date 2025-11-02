@@ -37,17 +37,13 @@ impl Command for DoneCommand {
             announce("Select tasks to mark as pending");
         }
 
-        let res = select_tasks(&mut rl, &file, self.config.columns, &self.config.view, Some(&self.filter), self.config.view.auto_select);
-        let (_, nrs) = match res {
-            Ok(nrs) => nrs,
+        let res = select_tasks_mut(&mut rl, &mut file, &self.config, Some(&self.filter));
+        let (_, selected) = match res {
+            Ok(res) => res,
             Err(ToroError::EofError()) => return Ok(()),
             Err(e) => return Err(e),
         };
-        let mut filtered = file.filtered_tasks_mut(&self.filter);
-
-        let selected = filtered.iter_mut()
-            .enumerate()
-            .filter_map(|(i, t)| if nrs.contains(&i) { Some(t) } else { None });
+        let nselected = selected.len();
 
         println!();
 
@@ -69,7 +65,7 @@ impl Command for DoneCommand {
 
         if self.config.git.auto_commit {
             let state = if self.undo { "pending" } else { "completed" };
-            file.commit(&format!("Marked {} tasks as \"{}\"", nrs.len(), state))?;
+            file.commit(&format!("Marked {} tasks as \"{}\"", nselected, state))?;
         }
         if self.config.git.auto_sync {
             file.sync()?;

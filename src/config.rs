@@ -103,6 +103,20 @@ pub struct ViewConfig {
     #[clap(long, overrides_with = "pretty_dates")]
     #[serde(skip)]
     no_pretty_dates: bool,
+
+    /// Use these keys to sort entries (last has highest priority)
+    #[clap(long)]
+    pub sort: Vec<SortBy>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize, clap::ValueEnum)]
+pub enum SortBy {
+    Completed,
+    Created,
+    Description,
+    Due,
+    Nop,
+    Priority,
 }
 
 
@@ -159,6 +173,14 @@ impl ViewConfig {
 
         if other.auto_select || other.no_auto_select {
             self.auto_select = other.auto_select
+        }
+
+        if other.pretty_dates || other.no_pretty_dates {
+            self.pretty_dates = other.pretty_dates
+        }
+
+        if !other.sort.is_empty() {
+            self.sort = other.sort.clone()
         }
     }
 }

@@ -2,10 +2,10 @@ use std::fmt::Display;
 
 use colored::{Color, Colorize};
 
-use crate::config::{ColumnSelector, ViewConfig};
+use crate::config::Config;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
-use crate::todotxt::TodoTxtFile;
+use crate::todotxt::{TodoTxtFile, TodoTxtTask};
 
 pub const COMPLETED_COLOR: Color = Color::BrightCyan;
 pub const PENDING_COLOR: Color = Color::BrightBlue;
@@ -66,13 +66,14 @@ pub fn announce(s: &str) {
     println!("\n{}\n", format!("=> {s}").green());
 }
 
-pub fn select_tasks(rl: &mut rustyline::DefaultEditor, file: &TodoTxtFile,
-        columns: ColumnSelector, view: &ViewConfig, filter_opt: Option<&Filter>, auto_select: bool) -> ToroResult<(bool, Vec<usize>)> {
-    let ntasks = file.list(true, true, columns, view, filter_opt);
+pub fn select_tasks_mut<'a>(rl: &mut rustyline::DefaultEditor, file: &'a mut TodoTxtFile, config: &Config, filter_opt: Option<&Filter>)
+        -> ToroResult<(bool, Vec<&'a mut TodoTxtTask>)> {
+    let ntasks = file.list(true, true, config.columns, &config.view, filter_opt);
 
-    if auto_select && ntasks == 1 {
+    if config.view.auto_select && ntasks == 1 {
         println!("\n  [Auto selecting task]");
-        return Ok((true, vec!(0)))
+        let mut tasks = file.filtered_sorted_mut(filter_opt, &config.view.sort);
+        return Ok((true, vec!(tasks.next().unwrap())))
     }
 
     println!();
@@ -93,10 +94,16 @@ pub fn select_tasks(rl: &mut rustyline::DefaultEditor, file: &TodoTxtFile,
             Err(_) => { eprintln!("{}", format!("Invalid input \"{}\"", answer).red()); continue },
         };
 
-        match nrs.iter().find(|n| **n >= ntasks) {
-            None => return Ok((false, nrs)),
-            Some(nr) => { eprintln!("{}", format!("Out of range: {}", nr + 1).red()); continue },
+        if let Some(nr) = nrs.iter().find(|n| **n >= ntasks) {
+            eprintln!("{}", format!("Out of range: {}", nr + 1).red());
+            continue
         }
+
+        let selected: Vec<_> = file.filtered_sorted_mut(filter_opt, &config.view.sort)
+            .enumerate()
+            .filter_map(|(i, t)| if nrs.contains(&i) { Some(t) } else { None })
+            .collect();
+        return Ok((false, selected))
     }
 }
 

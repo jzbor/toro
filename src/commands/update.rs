@@ -28,18 +28,13 @@ impl Command for UpdateCommand {
             }
 
             announce("Select tasks to update");
-            let res = select_tasks(&mut rl, &file, self.config.columns, &self.config.view, Some(&self.filter), self.config.view.auto_select);
-            let (auto_selected, nrs) = match res {
-                Ok(nrs) => nrs,
+            let res = select_tasks_mut(&mut rl, &mut file, &self.config, Some(&self.filter));
+            let (auto_selected, mut selected) = match res {
+                Ok(res) => res,
                 Err(ToroError::EofError()) => return Ok(()),
                 Err(e) => return Err(e),
             };
-
-            let filtered = file.filtered_tasks_mut(&self.filter);
-            let mut selected: Vec<_> = filtered.into_iter()
-                .enumerate()
-                .filter_map(|(i, t)| if nrs.contains(&i) { Some(t) } else { None })
-                .collect();
+            let nselected = selected.len();
 
             if selected.is_empty() {
                 continue;
@@ -190,12 +185,12 @@ impl Command for UpdateCommand {
                 break;
             }
 
-            println!("\nUpdated {} in {} task(s).\n", field.to_string_fancy(), nrs.len());
+            println!("\nUpdated {} in {} task(s).\n", field.to_string_fancy(), nselected);
 
             file.store()?;
 
             if self.config.git.auto_commit {
-                file.commit(&format!("Updated {} in {} task(s)", field, nrs.len()))?;
+                file.commit(&format!("Updated {} in {} task(s)", field, nselected))?;
             }
             if self.config.git.auto_sync {
                 file.sync()?;

@@ -1,7 +1,7 @@
 use crate::commands::Command;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
-use crate::interaction::{announce, select_tasks};
+use crate::interaction::{announce, select_tasks_mut};
 use crate::{exec, home, Config};
 
 #[derive(clap::Args, Debug)]
@@ -32,18 +32,13 @@ impl Command for PrioritizeCommand {
         }
 
         announce("Select tasks to prioritize");
-        let res = select_tasks(&mut rl, &file, self.config.columns, &self.config.view, Some(&self.filter), self.config.view.auto_select);
-        let (_, nrs) = match res {
-            Ok(nrs) => nrs,
+        let res = select_tasks_mut(&mut rl, &mut file, &self.config, Some(&self.filter));
+        let (_, mut selected) = match res {
+            Ok(res) => res,
             Err(ToroError::EofError()) => return Ok(()),
             Err(e) => return Err(e),
         };
-
-        let filtered = file.filtered_tasks_mut(&self.filter);
-        let mut selected: Vec<_> = filtered.into_iter()
-            .enumerate()
-            .filter_map(|(i, t)| if nrs.contains(&i) { Some(t) } else { None })
-            .collect();
+        let nselected = selected.len();
 
         if selected.is_empty() {
             return Ok(());
@@ -62,12 +57,12 @@ impl Command for PrioritizeCommand {
         selected.iter_mut()
             .for_each(|t| t.set_priority(priority));
 
-        println!("\nReprioritized {} task(s).\n",  nrs.len());
+        println!("\nReprioritized {} task(s).\n", nselected);
 
         file.store()?;
 
         if self.config.git.auto_commit {
-            file.commit(&format!("\nReprioritized {} task(s).\n",  nrs.len()))?;
+            file.commit(&format!("\nReprioritized {} task(s).\n", nselected))?;
         }
         if self.config.git.auto_sync {
             file.sync()?;
