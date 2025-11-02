@@ -133,6 +133,19 @@ pub fn select_field(rl: &mut rustyline::DefaultEditor) -> ToroResult<FieldSelect
             Err(e) => return Err(e.into()),
         };
 
+        let mut matches = fields.into_iter()
+            .filter(|f| f.to_string().starts_with(&answer));
+
+        if let Some(matching_field) = matches.next() {
+            match matches.next() {
+                Some(_other_field) => {
+                    eprintln!("{}", format!("Ambiguous selection: {}", answer).red());
+                    continue
+                },
+                None => return Ok(matching_field),
+            }
+        }
+
         for field in fields {
             if field.to_string().starts_with(&answer) {
                 return Ok(field);
