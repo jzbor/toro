@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::iter;
 
 use colored::{Color, Colorize};
 
@@ -86,7 +87,18 @@ pub fn select_tasks_mut<'a>(rl: &mut rustyline::DefaultEditor, file: &'a mut Tod
         };
         let numbers_result = answer.split(" ")
             .filter(|s| !s.is_empty())
-            .map(|s| str::parse::<usize>(s).map(|i| i - 1))
+            .flat_map(|s| {
+                if let Some((s1, s2)) = s.split_once("-") {
+                    let i1 = str::parse::<usize>(s1).map(|i| i - 1);
+                    let i2 = str::parse::<usize>(s2).map(|i| i - 1);
+                    match i1.and_then(|i1| i2.map(|i2| i1..=i2)) {
+                        Ok(range) => Box::new(range.map(Ok)) as Box<dyn Iterator<Item = Result<usize, _>>>,
+                        Err(e) => Box::new(iter::once(Err(e))) as Box<dyn Iterator<Item = Result<usize, _>>>,
+                    }
+                } else {
+                    Box::new(iter::once(str::parse::<usize>(s).map(|i| i - 1))) as Box<dyn Iterator<Item = Result<usize, _>>>
+                }
+            })
             .collect::<Result<Vec<_>, _>>();
 
         let nrs = match numbers_result {
