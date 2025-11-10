@@ -175,10 +175,11 @@ impl Command for UpdateCommand {
                         } else {
                             let prio: char = match answer.parse() {
                                 Ok(priority) => priority,
-                                Err(_) => return Err(ToroError::InvalidValueError(answer.clone(), field)),
+                                Err(_) => { complain(ToroError::InvalidValueError(answer.clone(), field)); continue },
                             };
                             if !prio.is_ascii_uppercase() {
-                                return Err(ToroError::InvalidValueError(answer.clone(), field));
+                                complain(ToroError::InvalidValueError(answer.clone(), field));
+                                continue
                             } else {
                                 Some(prio)
                             }
