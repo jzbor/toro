@@ -22,6 +22,11 @@ use crate::filter::Filter;
 use crate::exec::*;
 use crate::interaction::*;
 
+
+const DUE_KEY: &str = "due";
+const SCHEDULED_KEY: &str = "scheduled";
+
+
 #[derive(Debug)]
 pub struct TodoTxtFile {
     location: PathBuf,
@@ -142,7 +147,8 @@ impl TodoTxtFile {
                 Completed => entries.sort_by_key(|e| e.completed()),
                 Priority => entries.sort_by_key(|e| e.priority().unwrap_or('[')),
                 Nop => (),
-                Due => entries.sort_by_key(|e| Reverse(e.when_due().unwrap_or_default())),
+                Due => entries.sort_by_key(|e| Reverse(e.when_due().unwrap_or_default().unwrap_or_default())),
+                Scheduled => entries.sort_by_key(|e| Reverse(e.when_scheduled().unwrap_or_default().unwrap_or_default())),
             }
         }
 
@@ -165,9 +171,10 @@ impl TodoTxtFile {
                 Completed => entries.sort_by_key(|e| e.completed()),
                 Created => entries.sort_by_key(|e| Reverse(e.when_created().unwrap_or_default())),
                 Description => entries.sort_by_key(|e| e.description()),
-                Due => entries.sort_by_key(|e| e.when_due().unwrap_or_default().unwrap_or_default()),
+                Due => entries.sort_by_key(|e| Reverse(e.when_due().unwrap_or_default().unwrap_or_default())),
                 Nop => (),
                 Priority => entries.sort_by_key(|e| e.priority().unwrap_or('[')),
+                Scheduled => entries.sort_by_key(|e| Reverse(e.when_scheduled().unwrap_or_default().unwrap_or_default())),
             }
         }
 
@@ -277,7 +284,10 @@ impl TodoTxtTask {
                 let key = split.next().unwrap().to_owned();
                 let mut value = split.next().unwrap().to_owned();
 
-                if key == "due" && let Ok(new) = parse_date(&value) {
+                if key == DUE_KEY && let Ok(new) = parse_date(&value) {
+                    value = format_date(new, false);
+                }
+                if key == SCHEDULED_KEY && let Ok(new) = parse_date(&value) {
                     value = format_date(new, false);
                 }
                 description.push(DescriptionToken::Meta(key, value));
@@ -359,9 +369,58 @@ impl TodoTxtTask {
     }
 
     pub fn when_due(&self) -> ToroResult<Option<NaiveDate>> {
-        match self.meta("due") {
+        match self.meta(DUE_KEY) {
             Some(s) => Ok(Some(parse_date(s)?)),
             None => Ok(None),
+        }
+    }
+
+    pub fn when_scheduled(&self) -> ToroResult<Option<NaiveDate>> {
+        match self.meta(SCHEDULED_KEY) {
+            Some(s) => Ok(Some(parse_date(s)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn set_due(&mut self, date_opt: Option<NaiveDate>) {
+        if let Some(date) = date_opt {
+            for token in self.description.iter_mut() {
+                if let DescriptionToken::Meta(k, v) = token && k == DUE_KEY {
+                    *v = format_date(date, false);
+                    return
+                }
+            }
+            self.description.push(DescriptionToken::Other(" ".to_owned()));
+            self.description.push(DescriptionToken::Meta(DUE_KEY.to_owned(), format_date(date, false)));
+        } else {
+            self.description.retain(|e|
+                if let DescriptionToken::Meta(k, _) = e {
+                    k != DUE_KEY
+                } else {
+                    true
+                }
+            );
+        }
+    }
+
+    pub fn set_scheduled(&mut self, date_opt: Option<NaiveDate>) {
+        if let Some(date) = date_opt {
+            for token in self.description.iter_mut() {
+                if let DescriptionToken::Meta(k, v) = token && k == SCHEDULED_KEY {
+                    *v = format_date(date, false);
+                    return
+                }
+            }
+            self.description.push(DescriptionToken::Other(" ".to_owned()));
+            self.description.push(DescriptionToken::Meta(SCHEDULED_KEY.to_owned(), format_date(date, false)));
+        } else {
+            self.description.retain(|e|
+                if let DescriptionToken::Meta(k, _) = e {
+                    k != SCHEDULED_KEY
+                } else {
+                    true
+                }
+            );
         }
     }
 
@@ -421,7 +480,9 @@ impl TodoTxtTask {
         let mut s = String::new();
 
         for token in &self.description {
-            if let DescriptionToken::Meta(k, v) = token && k == "due" && let Ok(date) = parse_date(v) {
+            if let DescriptionToken::Meta(k, v) = token
+                    && (k == DUE_KEY || k == SCHEDULED_KEY)
+                    && let Ok(date) = parse_date(v) {
                 s.push_str(&token.colored(&format!("{}:{}", k, format_date(date, view.pretty_dates))));
             } else {
                 s.push_str(&token.to_string_colored());

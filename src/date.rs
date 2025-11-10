@@ -17,7 +17,7 @@ pub fn format_date(date: NaiveDate, nice: bool) -> String {
     } else if nice && diff.num_weeks().unsigned_abs() < 6 {
         format!("{}w", diff.num_weeks())
     } else {
-        format!("{:0>4}-{:0>2}-{:0>2} ", date.year(), date.month(), date.day())
+        format!("{:0>4}-{:0>2}-{:0>2}", date.year(), date.month(), date.day())
     }
 }
 

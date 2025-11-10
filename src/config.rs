@@ -118,6 +118,7 @@ pub enum SortBy {
     Due,
     Nop,
     Priority,
+    Scheduled,
 }
 
 

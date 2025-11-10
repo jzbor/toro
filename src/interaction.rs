@@ -9,29 +9,33 @@ use crate::filter::Filter;
 use crate::todotxt::{TodoTxtFile, TodoTxtTask};
 
 pub const COMPLETED_COLOR: Color = Color::BrightCyan;
-pub const PENDING_COLOR: Color = Color::BrightBlue;
-pub const SELECTION_COLOR: Color = Color::Yellow;
-pub const PRIORITY_A_COLOR: Color = Color::BrightMagenta;
-pub const PRIORITY_B_COLOR: Color = Color::BrightYellow;
-pub const PRIORITY_COLOR: Color = PRIORITY_A_COLOR;
 pub const COMPLETION_DATE_COLOR: Color = Color::Cyan;
 pub const CREATION_DATE_COLOR: Color = Color::Blue;
 pub const DESCRIPTION_COLOR: Color = SELECTION_COLOR;
+pub const DUE_COLOR: Color = Color::BrightCyan;
+pub const PENDING_COLOR: Color = Color::BrightBlue;
+pub const PRIORITY_A_COLOR: Color = Color::BrightMagenta;
+pub const PRIORITY_B_COLOR: Color = Color::BrightYellow;
+pub const PRIORITY_COLOR: Color = PRIORITY_A_COLOR;
+pub const SCHEDULED_COLOR: Color = Color::BrightBlue;
+pub const SELECTION_COLOR: Color = Color::Yellow;
 
 
 #[derive(Copy, Clone, Debug)]
 pub enum FieldSelection {
     Completed,
-    Priority,
     CompletionDate,
     CreationDate,
     Description,
+    DueDate,
+    Priority,
+    ScheduledDate,
 }
 
 
 impl FieldSelection {
     pub fn to_string_fancy(self) -> String {
-        self.to_string().color(self.get_color()).to_string()
+        self.to_string().color(self.color()).to_string()
     }
 }
 
@@ -45,19 +49,23 @@ impl Display for FieldSelection {
             CompletionDate => write!(f, "completion-date"),
             CreationDate => write!(f, "creation-date"),
             Description => write!(f, "description"),
+            DueDate => write!(f, "due"),
+            ScheduledDate => write!(f, "scheduled"),
         }
     }
 }
 
 impl FieldSelection {
-    fn get_color(self) -> Color {
+    pub fn color(self) -> Color {
         use FieldSelection::*;
         match self {
             Completed => COMPLETED_COLOR,
-            Priority => PRIORITY_COLOR,
             CompletionDate => COMPLETION_DATE_COLOR,
             CreationDate => CREATION_DATE_COLOR,
             Description => DESCRIPTION_COLOR,
+            DueDate => DUE_COLOR,
+            Priority => PRIORITY_COLOR,
+            ScheduledDate => SCHEDULED_COLOR,
         }
     }
 }
@@ -122,7 +130,7 @@ pub fn select_tasks_mut<'a>(rl: &mut rustyline::DefaultEditor, file: &'a mut Tod
 pub fn select_field(rl: &mut rustyline::DefaultEditor) -> ToroResult<FieldSelection> {
     loop {
         use FieldSelection::*;
-        let fields = [ Completed, Priority, CompletionDate, CreationDate, Description ];
+        let fields = [ Completed, Priority, CompletionDate, CreationDate, Description, DueDate, ScheduledDate, ];
         let fields_label = fields.iter()
             .map(|f| f.to_string_fancy())
             .collect::<Vec<_>>()

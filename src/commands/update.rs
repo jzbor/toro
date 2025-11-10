@@ -51,14 +51,14 @@ impl Command for UpdateCommand {
             use FieldSelection::*;
             let mut previous_values = match field {
                 Completed => selected.iter()
-                    .map(|t| t.completed().to_string().color(COMPLETED_COLOR).to_string())
+                    .map(|t| t.completed().to_string().color(field.color()).to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
                 Priority => selected.iter()
                     .map(|t| t.priority()
                         .map(|p| format!("{}", p))
                         .unwrap_or("none".to_string())
-                        .color(PRIORITY_COLOR)
+                        .color(field.color())
                         .to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
@@ -66,7 +66,7 @@ impl Command for UpdateCommand {
                     .map(|t| t.when_completed()
                         .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
                         .unwrap_or("none".to_string())
-                        .color(COMPLETION_DATE_COLOR)
+                        .color(field.color())
                         .to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
@@ -74,12 +74,30 @@ impl Command for UpdateCommand {
                     .map(|t| t.when_created()
                         .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
                         .unwrap_or("none".to_string())
-                        .color(CREATION_DATE_COLOR)
+                        .color(field.color())
                         .to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
                 Description => selected.iter()
-                    .map(|t| t.description().color(DESCRIPTION_COLOR).to_string())
+                    .map(|t| t.description().color(field.color()).to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                DueDate => selected.iter()
+                    .map(|t| t.when_due()
+                        .unwrap_or(None)
+                        .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
+                        .unwrap_or("none".to_string())
+                        .color(field.color())
+                        .to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ScheduledDate => selected.iter()
+                    .map(|t| t.when_scheduled()
+                        .unwrap_or(None)
+                        .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
+                        .unwrap_or("none".to_string())
+                        .color(field.color())
+                        .to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
             };
@@ -112,6 +130,20 @@ impl Command for UpdateCommand {
                     .unwrap_or(String::new()),
                 Description => selected.first()
                     .map(|t| t.description())
+                    .unwrap_or(String::new()),
+                DueDate => selected.first()
+                    .map(|t| t.when_due()
+                        .unwrap_or(None)
+                        .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
+                        .unwrap_or("none".to_string())
+                        .to_string())
+                    .unwrap_or(String::new()),
+                ScheduledDate => selected.first()
+                    .map(|t| t.when_scheduled()
+                        .unwrap_or(None)
+                        .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
+                        .unwrap_or("none".to_string())
+                        .to_string())
                     .unwrap_or(String::new()),
             };
 
@@ -179,6 +211,30 @@ impl Command for UpdateCommand {
                             eprintln!("Invalid input \"{}\" for description", answer);
                             continue;
                         }
+                    },
+                    DueDate => {
+                        let date: Option<NaiveDate> = if answer == "none" {
+                            None
+                        } else {
+                            match parse_date(&answer) {
+                                Ok(date) => Some(date),
+                                Err(_) => { eprintln!("Invalid value \"{}\" for field {}", answer, field); continue },
+                            }
+                        };
+                        selected.iter_mut()
+                            .for_each(|t| t.set_due(date))
+                    },
+                    ScheduledDate => {
+                        let date: Option<NaiveDate> = if answer == "none" {
+                            None
+                        } else {
+                            match parse_date(&answer) {
+                                Ok(date) => Some(date),
+                                Err(_) => { eprintln!("Invalid value \"{}\" for field {}", answer, field); continue },
+                            }
+                        };
+                        selected.iter_mut()
+                            .for_each(|t| t.set_scheduled(date))
                     },
                 };
 
