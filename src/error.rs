@@ -51,6 +51,9 @@ pub enum ToroError {
 
     #[error("Encountered EOF")]
     EofError(),
+
+    #[error("Invalid priority '{0}'")]
+    InvalidPriorityError(char),
 }
 
 pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {
