@@ -274,9 +274,13 @@ impl TodoTxtTask {
                 description.push(DescriptionToken::Context(val));
             } else if pair.as_rule() == Rule::meta {
                 let mut split = pair.as_str().split(":");
-                let key = split.next().unwrap();
-                let value = split.next().unwrap();
-                description.push(DescriptionToken::Meta(key.to_owned(), value.to_owned()));
+                let key = split.next().unwrap().to_owned();
+                let mut value = split.next().unwrap().to_owned();
+
+                if key == "due" && let Ok(new) = parse_date(&value) {
+                    value = format_date(new, false);
+                }
+                description.push(DescriptionToken::Meta(key, value));
             } else {
                 panic!("Unexpected pair ({:?})", pair.as_rule());
             }
@@ -335,6 +339,11 @@ impl TodoTxtTask {
         }
 
         s
+    }
+
+    pub fn project(&self) -> Option<&str> {
+        self.description.iter()
+            .find_map(|t| if let DescriptionToken::Project(p) = t { Some(p.as_str()) } else { None })
     }
 
     pub fn completed(&self) -> bool {

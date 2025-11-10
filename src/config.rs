@@ -110,6 +110,7 @@ pub struct ViewConfig {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "kebab-case")]
 pub enum SortBy {
     Completed,
     Created,
