@@ -2,7 +2,7 @@ use colored::Colorize;
 use chrono::{Datelike, NaiveDate};
 
 use crate::commands::Command;
-use crate::error::{ToroError, ToroResult};
+use crate::error::{complain, ToroError, ToroResult};
 use crate::filter::Filter;
 use crate::{exec, interaction::*};
 use crate::date::parse_date;
@@ -82,7 +82,7 @@ impl Command for UpdateCommand {
                     .map(|t| t.description().color(field.color()).to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
-                DueDate => selected.iter()
+                Due => selected.iter()
                     .map(|t| t.when_due()
                         .unwrap_or(None)
                         .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
@@ -91,7 +91,7 @@ impl Command for UpdateCommand {
                         .to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
-                ScheduledDate => selected.iter()
+                Scheduled => selected.iter()
                     .map(|t| t.when_scheduled()
                         .unwrap_or(None)
                         .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
@@ -131,14 +131,14 @@ impl Command for UpdateCommand {
                 Description => selected.first()
                     .map(|t| t.description())
                     .unwrap_or(String::new()),
-                DueDate => selected.first()
+                Due => selected.first()
                     .map(|t| t.when_due()
                         .unwrap_or(None)
                         .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
                         .unwrap_or("none".to_string())
                         .to_string())
                     .unwrap_or(String::new()),
-                ScheduledDate => selected.first()
+                Scheduled => selected.first()
                     .map(|t| t.when_scheduled()
                         .unwrap_or(None)
                         .map(|p| format!("{:0>4}-{:0>2}-{:0>2}", p.year(), p.month(), p.day()))
@@ -164,7 +164,7 @@ impl Command for UpdateCommand {
                     Completed => {
                         let completed: bool = match answer.parse() {
                             Ok(completed) => completed,
-                            Err(_) => { eprintln!("Invalid value \"{}\" for field {}", answer, field); continue },
+                            Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
                         };
                         selected.iter_mut()
                             .for_each(|t| t.set_completed(completed))
@@ -173,9 +173,14 @@ impl Command for UpdateCommand {
                         let priority: Option<char> = if answer == "none" {
                             None
                         } else {
-                            match answer.parse() {
-                                Ok(priority) => Some(priority),
-                                Err(_) => { eprintln!("Invalid value \"{}\" for field {}", answer, field); continue },
+                            let prio: char = match answer.parse() {
+                                Ok(priority) => priority,
+                                Err(_) => return Err(ToroError::InvalidValueError(answer.clone(), field)),
+                            };
+                            if !prio.is_ascii_uppercase() {
+                                return Err(ToroError::InvalidValueError(answer.clone(), field));
+                            } else {
+                                Some(prio)
                             }
                         };
                         selected.iter_mut()
@@ -187,7 +192,7 @@ impl Command for UpdateCommand {
                         } else {
                             match parse_date(&answer) {
                                 Ok(date) => Some(date),
-                                Err(_) => { eprintln!("Invalid value \"{}\" for field {}", answer, field); continue },
+                                Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
                             }
                         };
                         selected.iter_mut()
@@ -199,7 +204,7 @@ impl Command for UpdateCommand {
                         } else {
                             match parse_date(&answer) {
                                 Ok(date) => Some(date),
-                                Err(_) => { eprintln!("Invalid value \"{}\" for field {}", answer, field); continue },
+                                Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
                             }
                         };
                         selected.iter_mut()
@@ -208,29 +213,29 @@ impl Command for UpdateCommand {
                     Description => {
                         let res: ToroResult<()> = selected.iter_mut().try_for_each(|t| t.set_description(&answer));
                         if res.is_err() {
-                            eprintln!("Invalid input \"{}\" for description", answer);
+                            complain(ToroError::InvalidValueError(answer, field));
                             continue;
                         }
                     },
-                    DueDate => {
+                    Due => {
                         let date: Option<NaiveDate> = if answer == "none" {
                             None
                         } else {
                             match parse_date(&answer) {
                                 Ok(date) => Some(date),
-                                Err(_) => { eprintln!("Invalid value \"{}\" for field {}", answer, field); continue },
+                                Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
                             }
                         };
                         selected.iter_mut()
                             .for_each(|t| t.set_due(date))
                     },
-                    ScheduledDate => {
+                    Scheduled => {
                         let date: Option<NaiveDate> = if answer == "none" {
                             None
                         } else {
                             match parse_date(&answer) {
                                 Ok(date) => Some(date),
-                                Err(_) => { eprintln!("Invalid value \"{}\" for field {}", answer, field); continue },
+                                Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
                             }
                         };
                         selected.iter_mut()

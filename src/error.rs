@@ -4,6 +4,7 @@ use std::{io, process};
 
 use colored::Colorize;
 
+use crate::interaction::FieldSelection;
 use crate::todotxt;
 
 pub type ToroResult<T> = Result<T, ToroError>;
@@ -54,6 +55,9 @@ pub enum ToroError {
 
     #[error("Invalid priority '{0}'")]
     InvalidPriorityError(char),
+
+    #[error("Invalid value \"{0}\" for field \"{1}\"")]
+    InvalidValueError(String, FieldSelection),
 }
 
 pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {
@@ -64,4 +68,8 @@ pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {
             process::exit(1)
         },
     }
+}
+
+pub fn complain(err: ToroError) {
+    eprintln!("{} {}", "Error:".red(), err);
 }

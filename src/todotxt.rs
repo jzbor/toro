@@ -8,7 +8,7 @@ use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
-use chrono::{NaiveDate, Utc};
+use chrono::{NaiveDate, TimeDelta, Utc};
 use colored::Colorize;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
@@ -72,9 +72,14 @@ impl TodoTxtFile {
     pub fn load(path: PathBuf) -> ToroResult<Self> {
         let content = fs::read_to_string(&path)
             .map_err(|e| ToroError::NamedIOError(path.clone(), e))?;
+        eprintln!("loaded {} entries", 1);
         let tasks = content.lines()
             .map(TodoTxtTask::parse)
             .collect::<ToroResult<Vec<_>>>()?;
+        // eprintln!("result: {:#?}", res);
+        // eprintln!("{}", res.map_err(|e| e.to_string()).unwrap_err());
+        // todo!();
+        // let tasks = res?;
 
         let file = TodoTxtFile {
             location: path,
@@ -139,6 +144,8 @@ impl TodoTxtFile {
                 .collect()
         };
 
+        let naive_now: NaiveDate = Utc::now().naive_local().into();
+
         for key in sort_by {
             use SortBy::*;
             match key {
@@ -147,8 +154,8 @@ impl TodoTxtFile {
                 Completed => entries.sort_by_key(|e| e.completed()),
                 Priority => entries.sort_by_key(|e| e.priority().unwrap_or('[')),
                 Nop => (),
-                Due => entries.sort_by_key(|e| Reverse(e.when_due().unwrap_or_default().unwrap_or_default())),
-                Scheduled => entries.sort_by_key(|e| Reverse(e.when_scheduled().unwrap_or_default().unwrap_or_default())),
+                Due => entries.sort_by_key(|e| e.when_due().unwrap_or_default().map(|d| d - naive_now).unwrap_or(TimeDelta::MAX)),
+                Scheduled => entries.sort_by_key(|e| e.when_scheduled().unwrap_or_default().map(|d| d - naive_now).unwrap_or(TimeDelta::MAX)),
             }
         }
 
@@ -165,16 +172,18 @@ impl TodoTxtFile {
                 .collect()
         };
 
+        let naive_now: NaiveDate = Utc::now().naive_local().into();
+
         for key in sort_by {
             use SortBy::*;
             match key {
                 Completed => entries.sort_by_key(|e| e.completed()),
                 Created => entries.sort_by_key(|e| Reverse(e.when_created().unwrap_or_default())),
                 Description => entries.sort_by_key(|e| e.description()),
-                Due => entries.sort_by_key(|e| Reverse(e.when_due().unwrap_or_default().unwrap_or_default())),
+                Due => entries.sort_by_key(|e| e.when_due().unwrap_or_default().map(|d| d - naive_now).unwrap_or(TimeDelta::MAX)),
                 Nop => (),
                 Priority => entries.sort_by_key(|e| e.priority().unwrap_or('[')),
-                Scheduled => entries.sort_by_key(|e| Reverse(e.when_scheduled().unwrap_or_default().unwrap_or_default())),
+                Scheduled => entries.sort_by_key(|e| e.when_scheduled().unwrap_or_default().map(|d| d - naive_now).unwrap_or(TimeDelta::MAX)),
             }
         }
 
@@ -270,7 +279,7 @@ impl TodoTxtTask {
         let mut description = Vec::new();
 
         for pair in description_inner {
-            if pair.as_rule() == Rule::other {
+            if pair.as_rule() == Rule::other || pair.as_rule() == Rule::other_whitespace {
                 let val = pair.as_str().to_owned();
                 description.push(DescriptionToken::Other(val));
             } else if pair.as_rule() == Rule::project {
