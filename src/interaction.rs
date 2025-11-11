@@ -52,12 +52,6 @@ impl FieldSelection {
     }
 }
 
-impl Default for FieldSelection {
-    fn default() -> Self {
-        FieldSelection::Description
-    }
-}
-
 impl Display for FieldSelection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use FieldSelection::*;
