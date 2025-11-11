@@ -10,7 +10,7 @@ pub struct ViewCommand {
     numbered: bool,
 
     /// Sort tasks from top to bottom
-    #[clap(short, long)]
+    #[clap(long)]
     top_to_bottom: bool,
 
     #[clap(flatten)]
