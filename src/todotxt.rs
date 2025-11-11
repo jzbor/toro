@@ -72,14 +72,9 @@ impl TodoTxtFile {
     pub fn load(path: PathBuf) -> ToroResult<Self> {
         let content = fs::read_to_string(&path)
             .map_err(|e| ToroError::NamedIOError(path.clone(), e))?;
-        eprintln!("loaded {} entries", 1);
         let tasks = content.lines()
             .map(TodoTxtTask::parse)
             .collect::<ToroResult<Vec<_>>>()?;
-        // eprintln!("result: {:#?}", res);
-        // eprintln!("{}", res.map_err(|e| e.to_string()).unwrap_err());
-        // todo!();
-        // let tasks = res?;
 
         let file = TodoTxtFile {
             location: path,
