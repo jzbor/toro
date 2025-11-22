@@ -8,7 +8,7 @@ use crate::Config;
 const DATA_FILE_NAME: &str = "todo.txt";
 const CONFIG_FILE_NAME: &str = "config.toml";
 
-fn xdg_dirs() -> xdg::BaseDirectories {
+pub fn xdg_dirs() -> xdg::BaseDirectories {
     xdg::BaseDirectories::with_prefix("toro")
 }
 

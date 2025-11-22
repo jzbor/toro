@@ -9,6 +9,7 @@ pub mod edit;
 pub mod git;
 pub mod man;
 pub mod new;
+pub mod notes;
 pub mod rewrite;
 pub mod set;
 pub mod sync;

@@ -119,7 +119,6 @@ impl TodoTxtFile {
             eprintln!("\nNothing to commit.");
         }
         Ok(())
-
     }
 
     pub fn sync(&self) -> ToroResult<()> {

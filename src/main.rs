@@ -52,6 +52,9 @@ enum Subcommand {
     #[clap(alias("add"))]
     New(commands::new::NewCommand),
 
+    /// Edit notes for a project
+    Notes(commands::notes::NotesCommand),
+
     /// Change the priority of a task
     Prioritize(commands::set::SetCommand),
 
@@ -87,6 +90,7 @@ fn main() {
         Git(cmd) => cmd.configure_exec(config),
         Man(cmd) => cmd.configure_exec(config),
         New(cmd) => cmd.configure_exec(config),
+        Notes(cmd) => cmd.configure_exec(config),
         Prioritize(cmd) => cmd.with_field(FieldSelection::Priority).configure_exec(config),
         Rewrite(cmd) => cmd.configure_exec(config),
         Schedule(cmd) => cmd.with_field(FieldSelection::Scheduled).configure_exec(config),
