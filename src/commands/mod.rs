@@ -7,6 +7,7 @@ pub mod config;
 pub mod done;
 pub mod edit;
 pub mod git;
+pub mod init;
 pub mod man;
 pub mod new;
 pub mod notes;

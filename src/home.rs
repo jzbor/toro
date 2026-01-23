@@ -25,14 +25,14 @@ pub fn load_config() -> ToroResult<Option<Config>> {
 }
 
 
-fn load_data_file() -> ToroResult<TodoTxtFile> {
+pub fn load_data_file() -> ToroResult<TodoTxtFile> {
     let path = xdg_dirs()
         .find_data_file(DATA_FILE_NAME)
         .ok_or(ToroError::DataFileNotFound())?;
     TodoTxtFile::load(path)
 }
 
-fn place_data_file() -> ToroResult<PathBuf> {
+pub fn place_data_file() -> ToroResult<PathBuf> {
     xdg_dirs()
         .place_data_file(DATA_FILE_NAME)
         .map_err(ToroError::IOError)
@@ -42,3 +42,10 @@ pub fn load_or_create_data_file() -> ToroResult<TodoTxtFile> {
     load_data_file()
         .or_else(|_| place_data_file().map(TodoTxtFile::new))
 }
+
+pub fn propose_data_dir() -> ToroResult<PathBuf> {
+    xdg_dirs()
+        .get_data_home()
+        .ok_or(ToroError::MissingEnvVar("HOME"))
+}
+

@@ -26,6 +26,9 @@ pub enum ToroError {
     #[error("Data file not found")]
     DataFileNotFound(),
 
+    #[error("Data file already exists ({0})")]
+    DataFileExists(String),
+
     #[error("Date overflow")]
     DateOverflowError(),
 

@@ -44,6 +44,9 @@ enum Subcommand {
     /// Execute a git command inside the data directory
     Git(commands::git::GitCommand),
 
+    /// Initialize the data directory
+    Init(commands::init::InitCommand),
+
     /// Generate man pages
     #[clap(hide = true)]
     Man(commands::man::ManCommand),
@@ -97,6 +100,7 @@ fn main() {
         Sync(cmd) => cmd.configure_exec(config),
         Update(cmd) => cmd.configure_exec(config),
         View(cmd) => cmd.configure_exec(config),
+        Init(cmd) => cmd.configure_exec(config),
     };
 
     error::resolve(result)
