@@ -33,7 +33,6 @@ impl SetCommand {
 impl Command for SetCommand {
     fn exec(&self) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
-        let mut rl = rustyline::DefaultEditor::new()?;
         let field = match self.field {
             Some(f) => f,
             None => panic!("`field` not set"),
@@ -43,8 +42,7 @@ impl Command for SetCommand {
             exec::exec("sh", ["-c", cmd])?
         }
 
-        announce("Select tasks to update");
-        let res = select_tasks_mut(&mut rl, &mut file, &self.config, Some(&self.filter));
+        let res = select_tasks_mut(&mut file, &self.config, Some(&self.filter), "Select task(s) to update: ");
         let (_, mut selected) = match res {
             Ok(res) => res,
             Err(ToroError::EofError()) => return Ok(()),
@@ -63,7 +61,7 @@ impl Command for SetCommand {
             Completed => {
                 let completed: bool = match self.value.parse() {
                     Ok(completed) => completed,
-                    Err(_) => return Err(ToroError::InvalidValueError(self.value.clone(), field)),
+                    Err(_) => return Err(ToroError::InvalidValue(self.value.clone(), field)),
                 };
                 selected.iter_mut()
                     .for_each(|t| t.set_completed(completed))
@@ -74,10 +72,10 @@ impl Command for SetCommand {
                 } else {
                     let prio: char = match self.value.parse() {
                         Ok(priority) => priority,
-                        Err(_) => return Err(ToroError::InvalidValueError(self.value.clone(), field)),
+                        Err(_) => return Err(ToroError::InvalidValue(self.value.clone(), field)),
                     };
                     if !prio.is_ascii_uppercase() {
-                        return Err(ToroError::InvalidValueError(self.value.clone(), field));
+                        return Err(ToroError::InvalidValue(self.value.clone(), field));
                     } else {
                         Some(prio)
                     }
@@ -92,7 +90,7 @@ impl Command for SetCommand {
                 } else {
                     match parse_date(&self.value) {
                         Ok(date) => Some(date),
-                        Err(_) => return Err(ToroError::InvalidValueError(self.value.clone(), field)),
+                        Err(_) => return Err(ToroError::InvalidValue(self.value.clone(), field)),
                     }
                 };
                 selected.iter_mut()
@@ -104,7 +102,7 @@ impl Command for SetCommand {
                 } else {
                     match parse_date(&self.value) {
                         Ok(date) => Some(date),
-                        Err(_) => return Err(ToroError::InvalidValueError(self.value.clone(), field)),
+                        Err(_) => return Err(ToroError::InvalidValue(self.value.clone(), field)),
                     }
                 };
                 selected.iter_mut()
@@ -113,7 +111,7 @@ impl Command for SetCommand {
             Description => {
                 let res: ToroResult<()> = selected.iter_mut().try_for_each(|t| t.set_description(&self.value));
                 if res.is_err() {
-                    return Err(ToroError::InvalidValueError(self.value.clone(), field))
+                    return Err(ToroError::InvalidValue(self.value.clone(), field))
                 }
             },
             Due => {
@@ -122,7 +120,7 @@ impl Command for SetCommand {
                 } else {
                     match parse_date(&self.value) {
                         Ok(date) => Some(date),
-                        Err(_) => return Err(ToroError::InvalidValueError(self.value.clone(), field)),
+                        Err(_) => return Err(ToroError::InvalidValue(self.value.clone(), field)),
                     }
                 };
                 selected.iter_mut()
@@ -134,7 +132,7 @@ impl Command for SetCommand {
                 } else {
                     match parse_date(&self.value) {
                         Ok(date) => Some(date),
-                        Err(_) => return Err(ToroError::InvalidValueError(self.value.clone(), field)),
+                        Err(_) => return Err(ToroError::InvalidValue(self.value.clone(), field)),
                     }
                 };
                 selected.iter_mut()

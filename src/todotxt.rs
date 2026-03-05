@@ -16,7 +16,7 @@ use pest_derive::Parser;
 
 
 use crate::config::{ColumnSelector, SortBy, ViewConfig};
-use crate::date::*;
+use crate::{date::*, interaction};
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
 use crate::exec::*;
@@ -189,26 +189,19 @@ impl TodoTxtFile {
     }
 
     pub fn list(&self, numbered: bool, reverse: bool, columns: ColumnSelector, view: &ViewConfig, filter_opt: Option<&Filter>) -> usize {
-        let tasks: Vec<_> = self.filtered_sorted(filter_opt, &view.sort).collect();
+        let mut tasks: Vec<_> = self.filtered_sorted(filter_opt, &view.sort).collect();
 
         let ntasks = tasks.len();
-        let enumerated = if reverse {
-            Box::new(tasks.into_iter().enumerate().rev()) as Box<dyn Iterator<Item = (usize, &TodoTxtTask)>>
-        } else {
-            Box::new(tasks.into_iter().enumerate()) as Box<dyn Iterator<Item = (usize, &TodoTxtTask)>>
+        let numbering = match (numbered, reverse) {
+            (true, false) => Some((0..tasks.len()).collect::<Vec<_>>()),
+            (true, true) => Some((0..tasks.len()).rev().collect::<Vec<_>>()),
+            (false, _) => None,
         };
-
-        if numbered {
-            let max_width = ntasks.to_string().len();
-            for (i, task) in enumerated {
-                println!("{} {}", format!("[{: >width$}]", i + 1, width = max_width).color(SELECTION_COLOR),
-                    task.to_string_fancy(columns, view));
-            }
-        } else {
-            for (_, task) in enumerated {
-                println!("{}", task.to_string_fancy(columns, view));
-            }
+        if reverse {
+            tasks.reverse();
         }
+
+        interaction::list_tasks(&tasks, numbering.as_deref(), columns, view);
 
         ntasks
     }
@@ -345,6 +338,8 @@ impl TodoTxtTask {
 
         if self.completed() {
             s = s.strikethrough().to_string();
+        } else if self.when_due().ok().flatten().map(|d| d < Utc::now().naive_local().date()).unwrap_or_default() {
+            s = s.color(OVERDUE_COLOR).to_string();
         } else if self.priority() == Some('A') {
             s = s.color(PRIORITY_A_COLOR).to_string();
         } else if self.priority() == Some('B') {

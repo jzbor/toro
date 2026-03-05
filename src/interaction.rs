@@ -1,10 +1,13 @@
 use std::fmt::Display;
-use std::iter;
+use std::io::{Read, Write};
+use std::process::Stdio;
+use std::sync::{LazyLock, Mutex};
+use std::{iter, process};
 
 use colored::{Color, Colorize};
 
-use crate::config::Config;
-use crate::error::{ToroError, ToroResult};
+use crate::config::{ColumnSelector, Config, ViewConfig};
+use crate::error::{self, ToroError, ToroResult};
 use crate::filter::Filter;
 use crate::todotxt::{TodoTxtFile, TodoTxtTask};
 
@@ -12,13 +15,19 @@ pub const COMPLETED_COLOR: Color = Color::BrightCyan;
 pub const COMPLETION_DATE_COLOR: Color = Color::Cyan;
 pub const CREATION_DATE_COLOR: Color = Color::Blue;
 pub const DESCRIPTION_COLOR: Color = SELECTION_COLOR;
-pub const DUE_COLOR: Color = Color::BrightCyan;
+pub const DUE_COLOR: Color = Color::Green;
+pub const OVERDUE_COLOR: Color = Color::Red;
 pub const PENDING_COLOR: Color = Color::BrightBlue;
 pub const PRIORITY_A_COLOR: Color = Color::BrightMagenta;
 pub const PRIORITY_B_COLOR: Color = Color::BrightYellow;
 pub const PRIORITY_COLOR: Color = PRIORITY_A_COLOR;
-pub const SCHEDULED_COLOR: Color = Color::BrightBlue;
+pub const SCHEDULED_COLOR: Color = Color::BrightGreen;
 pub const SELECTION_COLOR: Color = Color::Yellow;
+
+
+static READLINE: LazyLock<Mutex<rustyline::DefaultEditor>> = LazyLock::new(|| {
+    error::resolve(rustyline::DefaultEditor::new()).into()
+});
 
 
 #[derive(Copy, Clone, Debug, clap::ValueEnum)]
@@ -67,29 +76,48 @@ impl Display for FieldSelection {
     }
 }
 
-pub fn announce(s: &str) {
-    println!("\n{}\n", format!("=> {s}").green());
+pub fn print_header(s: &str, level: usize) {
+    let line = format!("{:#>level$} {}", "", s, level=level);
+    println!("{}", line.yellow());
 }
 
-pub fn select_tasks_mut<'a>(rl: &mut rustyline::DefaultEditor, file: &'a mut TodoTxtFile, config: &Config, filter_opt: Option<&Filter>)
-        -> ToroResult<(bool, Vec<&'a mut TodoTxtTask>)> {
-    let ntasks = file.list(true, true, config.columns, &config.view, filter_opt);
+pub fn read_input(prompt: &str) -> ToroResult<String> {
+    let mut rl = READLINE.lock().unwrap();
 
-    if config.view.auto_select && ntasks == 1 {
+    match rl.readline(&prompt.bright_blue().bold().to_string()) {
+        Ok(answer) => Ok(answer),
+        Err(rustyline::error::ReadlineError::Eof) => Err(ToroError::EofError()),
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub fn select_tasks_mut<'a>(file: &'a mut TodoTxtFile, config: &Config, filter_opt: Option<&Filter>, prompt: &str)
+        -> ToroResult<(bool, Vec<&'a mut TodoTxtTask>)> {
+    let tasks: Vec<_> = file.filtered_sorted_mut(filter_opt, &config.view.sort).collect();
+
+    if config.view.auto_select && tasks.len() == 1 {
         println!("\n  [Auto selecting task]");
-        let mut tasks = file.filtered_sorted_mut(filter_opt, &config.view.sort);
-        return Ok((true, vec!(tasks.next().unwrap())))
+        return Ok((true, vec!(tasks.into_iter().next().unwrap())))
     }
 
-    println!();
+    if config.view.fzf {
+        Ok((false, fzf_select(tasks, Some(prompt), None)?))
+    } else {
+        let borrowed: Vec<_> = tasks.iter().map(|s| &**s).rev().collect();
+        let numbering: Vec<_> = (0..tasks.len()).rev().collect();
+        list_tasks(&borrowed, Some(numbering.as_slice()), config.columns, &config.view);
+        println!();
+        Ok((false, native_select(tasks, Some(prompt))?))
+    }
+}
+
+pub fn native_select<T: Display>(items: impl IntoIterator<Item = T>, prompt: Option<&str>) -> ToroResult<Vec<T>> {
+    let items: Vec<_> = items.into_iter().collect();
+    let prompt = prompt.unwrap_or("> ");
 
     loop {
-        let answer = match rl.readline("Please select one or multiple tasks: ") {
-            Ok(answer) => answer,
-            Err(rustyline::error::ReadlineError::Eof) => return Err(ToroError::EofError()),
-            Err(e) => return Err(e.into()),
-        };
-        let numbers_result = answer.split(" ")
+        let answer = read_input(prompt)?;
+        let indices_result = answer.split(" ")
             .filter(|s| !s.is_empty())
             .flat_map(|s| {
                 if let Some((s1, s2)) = s.split_once("-") {
@@ -105,25 +133,85 @@ pub fn select_tasks_mut<'a>(rl: &mut rustyline::DefaultEditor, file: &'a mut Tod
             })
             .collect::<Result<Vec<_>, _>>();
 
-        let nrs = match numbers_result {
+        let indices = match indices_result {
             Ok(nrs) => nrs,
             Err(_) => { eprintln!("{}", format!("Invalid input \"{}\"", answer).red()); continue },
         };
 
-        if let Some(nr) = nrs.iter().find(|n| **n >= ntasks) {
+        if let Some(nr) = indices.iter().find(|n| **n >= items.len()) {
             eprintln!("{}", format!("Out of range: {}", nr + 1).red());
             continue
         }
 
-        let selected: Vec<_> = file.filtered_sorted_mut(filter_opt, &config.view.sort)
+        let selected: Vec<_> = items.into_iter()
             .enumerate()
-            .filter_map(|(i, t)| if nrs.contains(&i) { Some(t) } else { None })
+            .filter(|(i, _)| indices.contains(i))
+            .map(|(_, e)| e)
             .collect();
-        return Ok((false, selected))
+
+        return Ok(selected)
     }
+
 }
 
-pub fn select_field(rl: &mut rustyline::DefaultEditor) -> ToroResult<FieldSelection> {
+pub fn fzf_select<T: Display>(items: impl IntoIterator<Item = T>, prompt: Option<&str>, preview: Option<&str>)
+        -> ToroResult<Vec<T>> {
+    let items: Vec<_> = items.into_iter().collect();
+    let mut cmd = process::Command::new("fzf");
+
+    cmd.args(["-d", ":", "--with-nth", "2..", "--multi"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+
+    if let Some(prompt) = prompt {
+        cmd.arg("--prompt");
+        cmd.arg(prompt);
+    }
+
+    if let Some(preview) = preview {
+        cmd.arg("--preview");
+        cmd.arg(preview);
+    }
+
+    let mut proc = cmd.spawn()?;
+
+    let list = items.iter()
+        .enumerate()
+        .map(|(i, e)| format!("{}:{}", i, e))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mut stdin = proc.stdin.take().unwrap();
+    let mut stdout = proc.stdout.take().unwrap();
+    stdin.write_all(list.as_bytes())?;
+
+    let mut output = String::new();
+    stdout.read_to_string(&mut output)?;
+
+    let indices: Vec<usize> = output.lines()
+        .map(|l| l.split(':').next().ok_or(ToroError::InvalidFzfResponse()))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .map(|n| n.parse())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let selected: Vec<_> = items.into_iter()
+        .enumerate()
+        .filter(|(i, _)| indices.contains(i))
+        .map(|(_, e)| e)
+        .collect();
+
+    if selected.is_empty() {
+        return Err(ToroError::EofError())
+    }
+
+    proc.wait()?;
+
+    Ok(selected)
+}
+
+pub fn select_field() -> ToroResult<FieldSelection> {
     loop {
         use FieldSelection::*;
         let fields = [ Completed, Priority, CompletionDate, CreationDate, Description, Due, Scheduled, ];
@@ -131,11 +219,8 @@ pub fn select_field(rl: &mut rustyline::DefaultEditor) -> ToroResult<FieldSelect
             .map(|f| f.to_string_fancy())
             .collect::<Vec<_>>()
             .join(", ");
-        let answer = match rl.readline(&format!("Available fields: {}\nPlease select a field: ", fields_label)) {
-            Ok(answer) => answer,
-            Err(rustyline::error::ReadlineError::Eof) => return Err(ToroError::EofError()),
-            Err(e) => return Err(e.into()),
-        };
+        println!("Available fields: {}", fields_label);
+        let answer = read_input("Please select a field: ")?;
 
         let mut matches = fields.into_iter()
             .filter(|f| f.to_string().starts_with(&answer));
@@ -157,5 +242,19 @@ pub fn select_field(rl: &mut rustyline::DefaultEditor) -> ToroResult<FieldSelect
         }
 
         eprintln!("{}", format!("Invalid field: {}", answer).red());
+    }
+}
+
+pub fn list_tasks(tasks: &[&TodoTxtTask], numbering: Option<&[usize]>, columns: ColumnSelector, view: &ViewConfig) {
+    if let Some(numbering) = numbering {
+        let max_width = tasks.len().to_string().len();
+        for (task, i) in tasks.iter().zip(numbering) {
+            println!("{} {}", format!("{: >width$}:", i + 1, width = max_width).color(SELECTION_COLOR),
+            task.to_string_fancy(columns, view));
+        }
+    } else {
+        for task in tasks {
+            println!("{}", task.to_string_fancy(columns, view));
+        }
     }
 }

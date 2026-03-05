@@ -24,20 +24,22 @@ pub struct DoneCommand {
 impl Command for DoneCommand {
     fn exec(&self) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
-        let mut rl = rustyline::DefaultEditor::new()?;
         let mut filter = self.filter.clone();
 
         if !self.undo {
             filter.include_completed = false;
             filter.include_pending = true;
-            announce("Select tasks to mark as completed");
         } else {
             filter.include_completed = true;
             filter.include_pending = false;
-            announce("Select tasks to mark as pending");
         }
+        let prompt = if !self.undo {
+            "Select tasks to mark as completed"
+        } else {
+            "Select tasks to mark as pending"
+        };
 
-        let res = select_tasks_mut(&mut rl, &mut file, &self.config, Some(&self.filter));
+        let res = select_tasks_mut(&mut file, &self.config, Some(&self.filter), prompt);
         let (_, selected) = match res {
             Ok(res) => res,
             Err(ToroError::EofError()) => return Ok(()),

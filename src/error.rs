@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::num::ParseIntError;
 use std::path::PathBuf;
 use std::{io, process};
 
@@ -56,11 +57,14 @@ pub enum ToroError {
     #[error("Encountered EOF")]
     EofError(),
 
-    #[error("Invalid priority '{0}'")]
-    InvalidPriorityError(char),
-
     #[error("Invalid value \"{0}\" for field \"{1}\"")]
-    InvalidValueError(String, FieldSelection),
+    InvalidValue(String, FieldSelection),
+
+    #[error("Invalid fzf response")]
+    InvalidFzfResponse(),
+
+    #[error("Integer parsing error - {0}")]
+    ParseInt(#[from] ParseIntError),
 }
 
 pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {

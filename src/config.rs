@@ -107,6 +107,16 @@ pub struct ViewConfig {
     /// Use these keys to sort entries (last has highest priority)
     #[clap(long)]
     pub sort: Vec<SortBy>,
+
+    /// Do use fzf for selection
+    #[clap(long)]
+    pub fzf: bool,
+
+    /// Do not use fzf for selection
+    #[clap(long, overrides_with = "pretty_dates")]
+    #[serde(skip)]
+    no_fzf: bool,
+
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize, clap::ValueEnum)]
@@ -179,6 +189,10 @@ impl ViewConfig {
 
         if other.pretty_dates || other.no_pretty_dates {
             self.pretty_dates = other.pretty_dates
+        }
+
+        if other.fzf || other.no_fzf {
+            self.fzf = other.fzf
         }
 
         if !other.sort.is_empty() {

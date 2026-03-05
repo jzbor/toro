@@ -20,15 +20,13 @@ pub struct UpdateCommand {
 impl Command for UpdateCommand {
     fn exec(&self) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
-        let mut rl = rustyline::DefaultEditor::new()?;
 
         loop {
             if let Some(cmd) = &self.config.view.cal_command {
                 exec::exec("sh", ["-c", cmd])?
             }
 
-            announce("Select tasks to update");
-            let res = select_tasks_mut(&mut rl, &mut file, &self.config, Some(&self.filter));
+            let res = select_tasks_mut(&mut file, &self.config, Some(&self.filter), "Select task(s) to update: ");
             let (auto_selected, mut selected) = match res {
                 Ok(res) => res,
                 Err(ToroError::EofError()) => return Ok(()),
@@ -41,8 +39,13 @@ impl Command for UpdateCommand {
             }
 
             println!();
+            print_header("Selected tasks:", 1);
+            let borrowed: Vec<_> = selected.iter().map(|s| &**s).collect();
+            list_tasks(&borrowed, None, self.config.columns, &self.config.view);
 
-            let field = match select_field(&mut rl) {
+            println!();
+
+            let field = match select_field() {
                 Ok(field) => field,
                 Err(ToroError::EofError()) => return Ok(()),
                 Err(e) => return Err(e),
@@ -164,7 +167,7 @@ impl Command for UpdateCommand {
                     Completed => {
                         let completed: bool = match answer.parse() {
                             Ok(completed) => completed,
-                            Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
+                            Err(_) => { complain(ToroError::InvalidValue(answer, field)); continue },
                         };
                         selected.iter_mut()
                             .for_each(|t| t.set_completed(completed))
@@ -175,10 +178,10 @@ impl Command for UpdateCommand {
                         } else {
                             let prio: char = match answer.parse() {
                                 Ok(priority) => priority,
-                                Err(_) => { complain(ToroError::InvalidValueError(answer.clone(), field)); continue },
+                                Err(_) => { complain(ToroError::InvalidValue(answer.clone(), field)); continue },
                             };
                             if !prio.is_ascii_uppercase() {
-                                complain(ToroError::InvalidValueError(answer.clone(), field));
+                                complain(ToroError::InvalidValue(answer.clone(), field));
                                 continue
                             } else {
                                 Some(prio)
@@ -193,7 +196,7 @@ impl Command for UpdateCommand {
                         } else {
                             match parse_date(&answer) {
                                 Ok(date) => Some(date),
-                                Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
+                                Err(_) => { complain(ToroError::InvalidValue(answer, field)); continue },
                             }
                         };
                         selected.iter_mut()
@@ -205,7 +208,7 @@ impl Command for UpdateCommand {
                         } else {
                             match parse_date(&answer) {
                                 Ok(date) => Some(date),
-                                Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
+                                Err(_) => { complain(ToroError::InvalidValue(answer, field)); continue },
                             }
                         };
                         selected.iter_mut()
@@ -214,7 +217,7 @@ impl Command for UpdateCommand {
                     Description => {
                         let res: ToroResult<()> = selected.iter_mut().try_for_each(|t| t.set_description(&answer));
                         if res.is_err() {
-                            complain(ToroError::InvalidValueError(answer, field));
+                            complain(ToroError::InvalidValue(answer, field));
                             continue;
                         }
                     },
@@ -224,7 +227,7 @@ impl Command for UpdateCommand {
                         } else {
                             match parse_date(&answer) {
                                 Ok(date) => Some(date),
-                                Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
+                                Err(_) => { complain(ToroError::InvalidValue(answer, field)); continue },
                             }
                         };
                         selected.iter_mut()
@@ -236,7 +239,7 @@ impl Command for UpdateCommand {
                         } else {
                             match parse_date(&answer) {
                                 Ok(date) => Some(date),
-                                Err(_) => { complain(ToroError::InvalidValueError(answer, field)); continue },
+                                Err(_) => { complain(ToroError::InvalidValue(answer, field)); continue },
                             }
                         };
                         selected.iter_mut()

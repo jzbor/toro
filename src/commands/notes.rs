@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::commands::Command;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
-use crate::interaction::{announce, select_tasks_mut};
+use crate::interaction::select_tasks_mut;
 use crate::todotxt::TodoTxtFile;
 use crate::{exec::exec, home, Config};
 
@@ -28,14 +28,12 @@ pub struct NotesCommand {
 impl Command for NotesCommand {
     fn exec(&self) -> ToroResult<()> {
         let mut file = home::load_or_create_data_file()?;
-        let mut rl = rustyline::DefaultEditor::new()?;
 
         if let Some(project) = &self.project {
             edit(&mut file, project)
         } else {
             loop {
-                announce("Select project to open notes");
-                let res = select_tasks_mut(&mut rl, &mut file, &self.config, Some(&self.filter));
+                let res = select_tasks_mut(&mut file, &self.config, Some(&self.filter), "Select project to open notes: ");
                 let (_, selected) = match res {
                     Ok(res) => res,
                     Err(ToroError::EofError()) => return Ok(()),
@@ -77,7 +75,7 @@ fn edit(file: &mut TodoTxtFile, project: &str) -> ToroResult<()> {
     exec(&editor, [note_file.to_string_lossy().to_string()])?;
 
     if note_file.exists() {
-        file.git(["add", &note_file.to_string_lossy().to_string()])?;
+        file.git(["add", note_file.to_string_lossy().as_ref()])?;
         file.commit("Updated notes")?;
     }
 
