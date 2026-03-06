@@ -34,10 +34,6 @@ impl Project {
         Ok(projects)
     }
 
-    pub fn fmt_prefixed(&self) -> String {
-        format!("+{}", self)
-    }
-
     pub fn edit_notes(&self) -> ToroResult<PathBuf> {
         let xdg = home::xdg_dirs();
         let note_file = xdg.place_data_file(PathBuf::from(NOTE_DIR).join(format!("{}.md", self.0)))?;
@@ -52,7 +48,7 @@ impl Project {
     pub fn notes(&self) -> ToroResult<Option<String>> {
         let xdg = home::xdg_dirs();
         match xdg.get_data_file(PathBuf::from(NOTE_DIR).join(format!("{}.md", self.0))) {
-            Some(file) => fs::read_to_string(file).map(|c| Some(c)).map_err(|e| e.into()),
+            Some(file) => fs::read_to_string(file).map(Some).map_err(|e| e.into()),
             None => Ok(None),
         }
     }
@@ -65,7 +61,6 @@ pub fn notes() -> ToroResult<Vec<PathBuf>> {
         None => return Ok(Vec::new()),
     };
     let note_files = note_dir.read_dir()?
-        .into_iter()
         .flatten()
         .filter(|f| f.file_name().to_string_lossy().ends_with(".md"))
         .map(|f| note_dir.join(f.file_name()))

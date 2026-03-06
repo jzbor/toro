@@ -94,11 +94,12 @@ pub fn read_input(prompt: &str) -> ToroResult<String> {
 }
 
 pub fn print_markdown(s: &str) {
+    // TODO adjust to follow CommonMark (https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis)
+    let re_bold = Regex::new(r#"(?<b>\*\*.*?\*\*)"#).unwrap();
+    let re_italic = Regex::new(r#"(?<b>\_.*?\_)"#).unwrap();
+
     for line in s.lines() {
         let mut formatted = line.to_owned();
-        // TODO adjust to follow CommonMark (https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis)
-        let re_bold = Regex::new(r#"(?<b>\*\*.*?\*\*)"#).unwrap();
-        let re_italic = Regex::new(r#"(?<b>\_.*?\_)"#).unwrap();
 
         // Add bold styling
         formatted = re_bold.replace_all(&formatted, |caps: &regex::Captures| {
@@ -129,7 +130,7 @@ pub fn select_tasks_mut<'a>(file: &'a mut TodoTxtFile, config: &Config, filter_o
 
     if config.view.fzf {
         let preview_cmd = format!("{}; CLICOLOR_FORCE=1 {} project --task \"$(echo \"{{}}\" | cut -d: -f2-)\"",
-            config.view.cal_command.as_ref().map(|s| s.as_str()).unwrap_or("true"),
+            config.view.cal_command.as_deref().unwrap_or("true"),
             env::current_exe()?.to_string_lossy());
         Ok((false, fzf_select(tasks, Some(prompt), Some(&preview_cmd))?))
     } else {
