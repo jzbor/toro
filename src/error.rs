@@ -27,6 +27,12 @@ pub enum ToroError {
     #[error("Data file not found")]
     DataFileNotFound(),
 
+    #[error("Task not found")]
+    TaskNotFound(),
+
+    #[error("Project not found")]
+    ProjectNotFound(),
+
     #[error("Data file already exists ({0})")]
     DataFileExists(String),
 

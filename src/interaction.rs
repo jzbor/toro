@@ -2,9 +2,10 @@ use std::fmt::Display;
 use std::io::{Read, Write};
 use std::process::Stdio;
 use std::sync::{LazyLock, Mutex};
-use std::{iter, process};
+use std::{env, iter, process};
 
 use colored::{Color, Colorize};
+use regex::Regex;
 
 use crate::config::{ColumnSelector, Config, ViewConfig};
 use crate::error::{self, ToroError, ToroResult};
@@ -92,6 +93,30 @@ pub fn read_input(prompt: &str) -> ToroResult<String> {
     }
 }
 
+pub fn print_markdown(s: &str) {
+    for line in s.lines() {
+        let mut formatted = line.to_owned();
+        let re_bold = Regex::new(r#"(?<b>\*\*.*?\*\*)"#).unwrap();
+        let re_italic = Regex::new(r#"(?<b>\_.*?\_)"#).unwrap();
+
+        // Add bold styling
+        formatted = re_bold.replace_all(&formatted, |caps: &regex::Captures| {
+            format!("{}", caps[0].to_string().bold())
+        }).to_string();
+
+        // Add italic styling
+        formatted = re_italic.replace_all(&formatted, |caps: &regex::Captures| {
+            format!("{}", caps[0].to_string().italic())
+        }).to_string();
+
+        if line.starts_with('#') {
+            formatted = format!("{}", formatted.yellow().bold())
+        }
+
+        println!("{}", formatted);
+    }
+}
+
 pub fn select_tasks_mut<'a>(file: &'a mut TodoTxtFile, config: &Config, filter_opt: Option<&Filter>, prompt: &str)
         -> ToroResult<(bool, Vec<&'a mut TodoTxtTask>)> {
     let tasks: Vec<_> = file.filtered_sorted_mut(filter_opt, &config.view.sort).collect();
@@ -102,7 +127,10 @@ pub fn select_tasks_mut<'a>(file: &'a mut TodoTxtFile, config: &Config, filter_o
     }
 
     if config.view.fzf {
-        Ok((false, fzf_select(tasks, Some(prompt), None)?))
+        let preview_cmd = format!("{}; CLICOLOR_FORCE=1 {} project --task \"$(echo \"{{}}\" | cut -d: -f2-)\"",
+            config.view.cal_command.as_ref().map(|s| s.as_str()).unwrap_or("true"),
+            env::current_exe()?.to_string_lossy());
+        Ok((false, fzf_select(tasks, Some(prompt), Some(&preview_cmd))?))
     } else {
         let borrowed: Vec<_> = tasks.iter().map(|s| &**s).rev().collect();
         let numbering: Vec<_> = (0..tasks.len()).rev().collect();

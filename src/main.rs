@@ -12,7 +12,11 @@ mod exec;
 mod filter;
 mod home;
 mod interaction;
+mod projects;
 mod todotxt;
+
+
+const NOTE_DIR: &str = "notes";
 
 
 /// CLI Client to manage a todo.txt list
@@ -58,6 +62,9 @@ enum Subcommand {
     /// Edit notes for a project
     Notes(commands::notes::NotesCommand),
 
+    /// View projects
+    Project(commands::project::ProjectCommand),
+
     /// Change the priority of a task
     Prioritize(commands::set::SetCommand),
 
@@ -91,16 +98,17 @@ fn main() {
         Due(cmd) => cmd.with_field(FieldSelection::Due).configure_exec(config),
         Edit(cmd) => cmd.configure_exec(config),
         Git(cmd) => cmd.configure_exec(config),
+        Init(cmd) => cmd.configure_exec(config),
         Man(cmd) => cmd.configure_exec(config),
         New(cmd) => cmd.configure_exec(config),
         Notes(cmd) => cmd.configure_exec(config),
         Prioritize(cmd) => cmd.with_field(FieldSelection::Priority).configure_exec(config),
+        Project(cmd) => cmd.configure_exec(config),
         Rewrite(cmd) => cmd.configure_exec(config),
         Schedule(cmd) => cmd.with_field(FieldSelection::Scheduled).configure_exec(config),
         Sync(cmd) => cmd.configure_exec(config),
         Update(cmd) => cmd.configure_exec(config),
         View(cmd) => cmd.configure_exec(config),
-        Init(cmd) => cmd.configure_exec(config),
     };
 
     error::resolve(result)

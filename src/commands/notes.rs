@@ -1,15 +1,10 @@
-use std::env;
-use std::path::PathBuf;
-
 use crate::commands::Command;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
 use crate::interaction::select_tasks_mut;
+use crate::projects::Project;
 use crate::todotxt::file::TodoTxtFile;
-use crate::{exec::exec, home, Config};
-
-
-const NOTE_DIR: &str = "notes";
+use crate::{home, Config};
 
 
 #[derive(clap::Args, Debug)]
@@ -30,7 +25,7 @@ impl Command for NotesCommand {
         let mut file = home::load_or_create_data_file()?;
 
         if let Some(project) = &self.project {
-            edit(&mut file, project)
+            edit(&mut file, &Project::new(project))
         } else {
             loop {
                 let res = select_tasks_mut(&mut file, &self.config, Some(&self.filter), "Select project to open notes: ");
@@ -50,7 +45,7 @@ impl Command for NotesCommand {
                 projects.sort();
                 projects.dedup();
 
-                let project = match projects.as_slice() {
+                let project = match &projects.as_slice() {
                     &[p] => p.to_owned(),
                     _ => { eprintln!("Project ambiguous"); continue },
                 };
@@ -65,14 +60,8 @@ impl Command for NotesCommand {
     }
 }
 
-fn edit(file: &mut TodoTxtFile, project: &str) -> ToroResult<()> {
-    let xdg = home::xdg_dirs();
-    let project = project.strip_prefix("+").unwrap_or(project);
-    let note_file = xdg.place_data_file(PathBuf::from(NOTE_DIR).join(format!("{}.md", project)))?;
-    let editor = env::var("EDITOR")
-        .map_err(|_| ToroError::MissingEnvVar("EDITOR"))?;
-
-    exec(&editor, [note_file.to_string_lossy().to_string()])?;
+fn edit(file: &mut TodoTxtFile, project: &Project) -> ToroResult<()> {
+    let note_file = project.edit_notes()?;
 
     if note_file.exists() {
         file.git(["add", note_file.to_string_lossy().as_ref()])?;

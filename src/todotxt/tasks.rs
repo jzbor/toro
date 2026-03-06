@@ -12,6 +12,7 @@ use crate::config::{ColumnSelector, ViewConfig};
 use crate::date::*;
 use crate::error::{ToroError, ToroResult};
 use crate::interaction::*;
+use crate::projects::Project;
 
 
 const DUE_KEY: &str = "due";
@@ -188,9 +189,9 @@ impl TodoTxtTask {
         s
     }
 
-    pub fn project(&self) -> Option<&str> {
+    pub fn project(&self) -> Option<Project> {
         self.description.iter()
-            .find_map(|t| if let DescriptionToken::Project(p) = t { Some(p.as_str()) } else { None })
+            .find_map(|t| if let DescriptionToken::Project(p) = t { Some(Project::new(p.as_str())) } else { None })
     }
 
     pub fn completed(&self) -> bool {

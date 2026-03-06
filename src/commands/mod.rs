@@ -11,6 +11,7 @@ pub mod init;
 pub mod man;
 pub mod new;
 pub mod notes;
+pub mod project;
 pub mod rewrite;
 pub mod set;
 pub mod sync;
