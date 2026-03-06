@@ -5,7 +5,7 @@ use crate::commands::Command;
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
 use crate::interaction::select_tasks_mut;
-use crate::todotxt::TodoTxtFile;
+use crate::todotxt::file::TodoTxtFile;
 use crate::{exec::exec, home, Config};
 
 

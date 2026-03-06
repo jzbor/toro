@@ -19,7 +19,7 @@ pub enum ToroError {
     IOError(#[from] io::Error),
 
     #[error("Invalid syntax\n{0}")]
-    SyntaxError(Box<pest::error::Error<todotxt::Rule>>),
+    SyntaxError(Box<pest::error::Error<todotxt::tasks::Rule>>),
 
     #[error("Invalid date \"{0}\"")]
     DateInputError(String),

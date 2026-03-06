@@ -1,7 +1,7 @@
 use chrono::Utc;
 use clap::ArgAction;
 
-use crate::todotxt::TodoTxtTask;
+use crate::todotxt::tasks::TodoTxtTask;
 
 
 #[derive(clap::Args, Debug, Clone)]

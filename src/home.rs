@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::error::{ToroError, ToroResult};
-use crate::todotxt::TodoTxtFile;
+use crate::todotxt::file::TodoTxtFile;
 use crate::Config;
 
 const DATA_FILE_NAME: &str = "todo.txt";

@@ -9,7 +9,8 @@ use colored::{Color, Colorize};
 use crate::config::{ColumnSelector, Config, ViewConfig};
 use crate::error::{self, ToroError, ToroResult};
 use crate::filter::Filter;
-use crate::todotxt::{TodoTxtFile, TodoTxtTask};
+use crate::todotxt::tasks::*;
+use crate::todotxt::file::*;
 
 pub const COMPLETED_COLOR: Color = Color::BrightCyan;
 pub const COMPLETION_DATE_COLOR: Color = Color::Cyan;

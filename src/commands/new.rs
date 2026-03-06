@@ -2,7 +2,7 @@ use colored::Colorize;
 
 use crate::commands::Command;
 use crate::error::ToroResult;
-use crate::todotxt::TodoTxtTask;
+use crate::todotxt::tasks::TodoTxtTask;
 use crate::{home, Config};
 use crate::interaction::*;
 
