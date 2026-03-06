@@ -96,6 +96,7 @@ pub fn read_input(prompt: &str) -> ToroResult<String> {
 pub fn print_markdown(s: &str) {
     for line in s.lines() {
         let mut formatted = line.to_owned();
+        // TODO adjust to follow CommonMark (https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis)
         let re_bold = Regex::new(r#"(?<b>\*\*.*?\*\*)"#).unwrap();
         let re_italic = Regex::new(r#"(?<b>\_.*?\_)"#).unwrap();
 
