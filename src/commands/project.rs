@@ -40,35 +40,35 @@ impl Command for ProjectCommand {
         let mut file = home::load_or_create_data_file()?;
 
         if self.args.list {
-            let projects = Project::all(&mut file)?;
-            for project in projects {
+            for project in Project::all(&mut file)? {
                 println!("{}", project)
             }
+
             return Ok(())
+        } else if self.args.project.is_some() || self.args.task.is_some() {
+            let project = if let Some(project) = self.args.project.as_ref() {
+                Project::new(project)
+            } else if let Some(task_str) = self.args.task.as_ref() {
+                let task = TodoTxtTask::parse(task_str)?;
+                task.project()
+                    .ok_or(ToroError::ProjectNotFound())?
+            } else {
+                panic!()
+            };
+
+            let notes = project.notes()
+                .ok().flatten()
+                .unwrap_or_default();
+            let tasks = file.iter()
+                .filter(|t| t.project() == Some(project.clone()))
+                .map(|t| t.to_string())
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            print_markdown("# Tasks");
+            println!("{}\n", tasks);
+            print_markdown(&notes);
         }
-
-        let project = if let Some(project) = self.args.project.as_ref() {
-            Project::new(project)
-        } else if let Some(task_str) = self.args.task.as_ref() {
-            let task = TodoTxtTask::parse(task_str)?;
-            task.project()
-                .ok_or(ToroError::ProjectNotFound())?
-        } else {
-            panic!()
-        };
-
-        let notes = project.notes()
-            .ok().flatten()
-            .unwrap_or_default();
-        let tasks = file.iter()
-            .filter(|t| t.project() == Some(project.clone()))
-            .map(|t| t.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
-        print_markdown("# Tasks");
-        println!("{}\n", tasks);
-        print_markdown(&notes);
-
 
         Ok(())
     }

@@ -63,6 +63,7 @@ enum Subcommand {
     Notes(commands::notes::NotesCommand),
 
     /// View projects
+    #[clap(alias("projects"))]
     Project(commands::project::ProjectCommand),
 
     /// Change the priority of a task
