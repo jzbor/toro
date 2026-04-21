@@ -68,6 +68,9 @@ pub enum ToroError {
 
     #[error("Integer parsing error - {0}")]
     ParseInt(#[from] ParseIntError),
+
+    #[error("Invalid data directory during creation")]
+    DataDirInvalidCreation(),
 }
 
 pub fn resolve<T, E: Display>(result: Result<T, E>) -> T {
