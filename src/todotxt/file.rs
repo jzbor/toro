@@ -67,13 +67,8 @@ impl TodoTxtFile {
         exec("git", args)
     }
 
-    pub fn dirty(&self) -> bool {
-        self.git(["diff-index", "--quiet", "HEAD"])
-            .is_err_and(|e| matches!(e, ToroError::ExternalCommandFailed(_)))
-    }
-
     pub fn commit(&self, msg: &str) -> ToroResult<()> {
-        if self.dirty() {
+        if self.is_git_dirty() {
             eprintln!("\nCommitting changes...");
             let full_msg = format!("[toro] {}", msg);
             self.git(["commit", "-am", &full_msg])?;
@@ -84,10 +79,25 @@ impl TodoTxtFile {
     }
 
     pub fn sync(&self) -> ToroResult<()> {
-        eprintln!("\nSyncing git repo");
-        self.git(["pull", "--rebase"])?;
-        self.git(["push"])?;
+        if self.is_git() {
+            eprintln!("\nSyncing git repo");
+            self.git(["pull", "--rebase"])?;
+            self.git(["push"])?;
+        } else {
+            eprintln!("\nNothing to sync.");
+        }
         Ok(())
+    }
+
+    pub fn is_git(&self) -> bool {
+        let local = PathBuf::from(".");
+        let path = self.location.parent().unwrap_or(&local).to_string_lossy();
+        exec_quiet("git", ["-C", path.as_ref(), "rev-parse"]).is_ok()
+    }
+
+    pub fn is_git_dirty(&self) -> bool {
+        self.is_git() && self.git(["diff-index", "--quiet", "HEAD"])
+            .is_err_and(|e| matches!(e, ToroError::ExternalCommandFailed(_)))
     }
 
     pub fn filtered_sorted(&self, filter_opt: Option<&Filter>, sort_by: &[SortBy]) -> impl Iterator<Item = &TodoTxtTask> {

@@ -17,3 +17,18 @@ pub fn exec(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Tor
         Ok(())
     }
 }
+
+pub fn exec_quiet(cmd: &str, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> ToroResult<()> {
+    let status = process::Command::new(cmd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()?;
+
+    if !status.success() {
+        Err(ToroError::ExternalCommandFailed(cmd.to_owned()))
+    } else {
+        Ok(())
+    }
+}
