@@ -34,9 +34,9 @@ impl Command for DoneCommand {
             filter.include_pending = false;
         }
         let prompt = if !self.undo {
-            "Select tasks to mark as completed"
+            "Select tasks to mark as completed: "
         } else {
-            "Select tasks to mark as pending"
+            "Select tasks to mark as pending: "
         };
 
         let res = select_tasks_mut(&mut file, &self.config, Some(&self.filter), prompt);
