@@ -4,7 +4,6 @@ use crate::Config;
 
 pub mod completions;
 pub mod config;
-pub mod done;
 pub mod edit;
 pub mod git;
 pub mod init;
@@ -16,7 +15,7 @@ pub mod rewrite;
 pub mod set;
 pub mod sync;
 pub mod update;
-pub mod view;
+pub mod list;
 
 pub trait Command: clap::Args {
     fn exec(&self) -> ToroResult<()>;

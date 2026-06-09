@@ -12,7 +12,7 @@ pub struct SetCommand {
     #[clap(skip)]
     field: Option<FieldSelection>,
 
-    /// Value to set
+    /// New value for field
     value: String,
 
     #[clap(flatten)]
