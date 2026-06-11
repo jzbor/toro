@@ -1,8 +1,14 @@
+use std::cmp::Reverse;
+
+use chrono::NaiveDate;
+
 use crate::commands::Command;
+use crate::config::{SortBy, ViewConfig};
 use crate::error::{ToroError, ToroResult};
 use crate::filter::Filter;
-use crate::interaction::print_markdown;
+use crate::interaction::{inc_markdown_headers, print_markdown};
 use crate::projects::Project;
+use crate::todotxt::file::TodoTxtFile;
 use crate::todotxt::tasks::TodoTxtTask;
 use crate::{home, Config};
 
@@ -20,7 +26,7 @@ pub struct ProjectCommand {
 }
 
 #[derive(clap::Args, Debug)]
-#[group(required = true, multiple = false)]
+#[group(required = false, multiple = false)]
 struct ProjectArgs {
     /// Name of the project
     project: Option<String>,
@@ -56,18 +62,39 @@ impl Command for ProjectCommand {
                 panic!()
             };
 
-            let notes = project.notes()
-                .ok().flatten()
-                .unwrap_or_default();
-            let tasks = file.iter()
-                .filter(|t| t.project() == Some(project.clone()))
-                .map(|t| t.to_string())
-                .collect::<Vec<_>>()
-                .join("\n");
+            let notes = project.notes().ok().flatten();
+            let tasks: Vec<_> = project.tasks(&file, &self.filter, &self.config.view.sort).collect();
+            show_project(&project, notes, &tasks, &self.config);
 
-            print_markdown("# Tasks");
-            println!("{}\n", tasks);
-            print_markdown(&notes);
+        } else {
+            let mut projects: Vec<(_, _)> = Project::all(&mut file)?
+                .into_iter()
+                .map(|p| {
+                    let tasks = p.tasks(&file, &self.filter, &self.config.view.sort).collect::<Vec<_>>();
+                    (p, tasks)
+                })
+                .collect();
+
+            projects.sort_by_key(|(_, ts)| ts.len());
+            projects.sort_by_key(|(_, ts)| Reverse(ts.iter()
+                    .map(|t| t.priority().unwrap_or(char::MAX))
+                    .min().unwrap_or(char::MAX)));
+            projects.sort_by_key(|(_, ts)| Reverse(ts.iter()
+                    .map(|t| t.when_due().ok().flatten().unwrap_or(NaiveDate::MAX))
+                    .min().unwrap_or(NaiveDate::MAX)));
+            projects.sort_by_key(|(_, ts)| Reverse(ts.iter()
+                    .map(|t| t.when_scheduled().ok().flatten().unwrap_or(NaiveDate::MAX))
+                    .min().unwrap_or(NaiveDate::MAX)));
+            // projects.sort_by_key(|(_, ts)| Reverse(ts.iter().flat_map(|t| t.when_due().ok().flatten()).min()));
+
+            for (project, tasks) in &projects {
+                let notes = project.notes().ok().flatten();
+
+                if notes.is_some() || !tasks.is_empty() {
+                    show_project(project, notes, tasks, &self.config);
+                    println!();
+                }
+            }
         }
 
         Ok(())
@@ -76,5 +103,26 @@ impl Command for ProjectCommand {
 
     fn config_mut(&mut self) -> &mut Config {
         &mut self.config
+    }
+}
+
+fn show_project(project: &Project, notes: Option<String>, tasks: &[&TodoTxtTask], config: &Config) {
+    let tasks = tasks.into_iter()
+        .filter(|t| t.project() == Some(project.clone()))
+        .map(|t| t.to_string_fancy(config.columns, &config.view))
+        .map(|s| format!("- {}", s.trim()))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    print_markdown(&format!("# {}", project.name()));
+
+    if let Some(notes) = notes {
+        print_markdown(&inc_markdown_headers(&notes));
+    }
+
+    if tasks.len() > 0 {
+        println!();
+        print_markdown("## Tasks");
+        println!("{}", tasks);
     }
 }

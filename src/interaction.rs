@@ -93,6 +93,21 @@ pub fn read_input(prompt: &str) -> ToroResult<String> {
     }
 }
 
+pub fn inc_markdown_headers(s: &str) -> String {
+    let mut incremented = String::new();
+
+    for line in s.lines() {
+        if line.starts_with("#") {
+            incremented.push_str(&format!("#{}", line));
+        } else {
+            incremented.push_str(line);
+        }
+        incremented.push('\n');
+    }
+
+    incremented
+}
+
 pub fn print_markdown(s: &str) {
     // TODO adjust to follow CommonMark (https://spec.commonmark.org/0.31.2/#emphasis-and-strong-emphasis)
     let re_bold = Regex::new(r#"(?<b>\*\*.*?\*\*)"#).unwrap();

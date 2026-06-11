@@ -2,8 +2,11 @@ use std::{env, fs};
 use std::fmt::Display;
 use std::path::PathBuf;
 
+use crate::config::SortBy;
 use crate::error::{ToroError, ToroResult};
 use crate::exec::exec;
+use crate::filter::Filter;
+use crate::todotxt::tasks::TodoTxtTask;
 use crate::{NOTE_DIR, home};
 use crate::todotxt::file::TodoTxtFile;
 
@@ -18,7 +21,11 @@ impl Project {
         Project(name.to_owned())
     }
 
-    pub fn all(file: &mut TodoTxtFile) -> ToroResult<Vec<Self>> {
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+
+    pub fn all(file: &TodoTxtFile) -> ToroResult<Vec<Self>> {
         let mut projects = Vec::new();
         let task_projects = file.iter().flat_map(|t| t.project().map(|p| p.to_owned()));
         let note_projects = notes()?.into_iter()
@@ -51,6 +58,12 @@ impl Project {
             Some(file) => fs::read_to_string(file).map(Some).map_err(|e| e.into()),
             None => Ok(None),
         }
+    }
+
+
+    pub fn tasks<'a>(&self, file: &'a TodoTxtFile, filter: &Filter, sort: &[SortBy]) -> impl Iterator<Item = &'a TodoTxtTask> {
+        file.filtered_sorted(Some(filter), sort)
+            .filter(|t| t.project() == Some(self.clone()))
     }
 }
 

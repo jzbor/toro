@@ -63,7 +63,7 @@ impl Command for NotesCommand {
 fn edit(file: &mut TodoTxtFile, project: &Project) -> ToroResult<()> {
     let note_file = project.edit_notes()?;
 
-    if note_file.exists() {
+    if note_file.exists() && file.is_git_dirty() {
         file.git(["add", note_file.to_string_lossy().as_ref()])?;
         file.commit("Updated notes")?;
     }
